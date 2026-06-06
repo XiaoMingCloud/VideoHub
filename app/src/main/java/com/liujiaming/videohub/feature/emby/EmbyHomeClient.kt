@@ -11,29 +11,23 @@ import java.net.URL
 object EmbyHomeClient {
     fun fetchHome(session: EmbyAuthSession): EmbyMediaHome {
         val libraries = fetchLibraries(session)
-        val resumeItems = runCatching {
-            fetchItems(
-                session = session,
-                path = "/Users/${session.userId}/Items",
-                query = mapOf(
-                    "Recursive" to "true",
-                    "Filters" to "IsResumable",
-                    "Limit" to "10",
-                    "SortBy" to "DatePlayed",
-                    "SortOrder" to "Descending"
-                )
+        val resumeItems = fetchResumeItems(session)
+        val librarySections = libraries.map { library ->
+            EmbyLibrarySection(
+                libraryId = library.id,
+                title = library.name,
+                items = fetchLibraryItems(session, library.id)
             )
-        }.getOrDefault(emptyList())
-        val latestItems = runCatching {
-            fetchLatestItems(session)
-        }.getOrDefault(emptyList())
+        }
+        val latestItems = librarySections.firstOrNull { it.items.isNotEmpty() }?.items.orEmpty()
 
         return EmbyMediaHome(
             sourceName = session.serverName.ifBlank { "Emby" },
             libraries = libraries,
             resumeItems = resumeItems,
             latestTitle = libraries.firstOrNull()?.name ?: "最新媒体",
-            latestItems = latestItems
+            latestItems = latestItems,
+            librarySections = librarySections
         )
     }
 
@@ -80,18 +74,45 @@ object EmbyHomeClient {
         }.getOrDefault(fallbackCount)
     }
 
-    private fun fetchLatestItems(session: EmbyAuthSession): List<EmbyMediaItem> {
-        val jsonArray = getJsonArrayResponse(
-            session = session,
-            path = "/Users/${session.userId}/Items/Latest",
-            query = mapOf("Limit" to "10")
-        )
+    private fun fetchLibraryItems(session: EmbyAuthSession, libraryId: String): List<EmbyMediaItem> {
+        return runCatching {
+            fetchItems(
+                session = session,
+                path = "/Users/${session.userId}/Items",
+                query = mapOf(
+                    "ParentId" to libraryId,
+                    "Recursive" to "true",
+                    "IncludeItemTypes" to "Movie,Series,Episode,Video",
+                    "Limit" to "10",
+                    "SortBy" to "DateCreated",
+                    "SortOrder" to "Descending"
+                )
+            )
+        }.getOrDefault(emptyList())
+    }
 
-        return buildList {
-            for (index in 0 until jsonArray.length()) {
-                val item = jsonArray.getJSONObject(index)
-                add(item.toMediaItem(session))
-            }
+    private fun fetchResumeItems(session: EmbyAuthSession): List<EmbyMediaItem> {
+        return runCatching {
+            fetchItems(
+                session = session,
+                path = "/Users/${session.userId}/Items/Resume",
+                query = mapOf(
+                    "Limit" to "10",
+                    "MediaTypes" to "Video"
+                )
+            )
+        }.getOrElse {
+            fetchItems(
+                session = session,
+                path = "/Users/${session.userId}/Items",
+                query = mapOf(
+                    "Recursive" to "true",
+                    "Filters" to "IsResumable",
+                    "Limit" to "10",
+                    "SortBy" to "DatePlayed",
+                    "SortOrder" to "Descending"
+                )
+            )
         }
     }
 
@@ -116,11 +137,7 @@ object EmbyHomeClient {
             id = id,
             name = optString("Name", "未命名"),
             type = optString("Type"),
-            imageUrl = if (id.isBlank()) {
-                ""
-            } else {
-                imageUrl(session, id, 360)
-            }
+            imageUrl = if (id.isBlank()) "" else imageUrl(session, id, 360)
         )
     }
 
@@ -134,14 +151,6 @@ object EmbyHomeClient {
         query: Map<String, String> = emptyMap()
     ): JSONObject {
         return JSONObject(getTextResponse(session, path, query))
-    }
-
-    private fun getJsonArrayResponse(
-        session: EmbyAuthSession,
-        path: String,
-        query: Map<String, String> = emptyMap()
-    ): JSONArray {
-        return JSONArray(getTextResponse(session, path, query))
     }
 
     private fun getTextResponse(
@@ -191,7 +200,14 @@ data class EmbyMediaHome(
     val libraries: List<EmbyLibrarySummary>,
     val resumeItems: List<EmbyMediaItem>,
     val latestTitle: String,
-    val latestItems: List<EmbyMediaItem>
+    val latestItems: List<EmbyMediaItem>,
+    val librarySections: List<EmbyLibrarySection> = emptyList()
+)
+
+data class EmbyLibrarySection(
+    val libraryId: String,
+    val title: String,
+    val items: List<EmbyMediaItem>
 )
 
 data class EmbyLibrarySummary(

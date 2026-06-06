@@ -23,6 +23,9 @@ object EmbyImageCache {
             home.libraries.mapNotNullTo(this) { it.imageUrl.takeIf(String::isNotBlank) }
             home.resumeItems.mapNotNullTo(this) { it.imageUrl.takeIf(String::isNotBlank) }
             home.latestItems.mapNotNullTo(this) { it.imageUrl.takeIf(String::isNotBlank) }
+            home.librarySections.forEach { section ->
+                section.items.mapNotNullTo(this) { it.imageUrl.takeIf(String::isNotBlank) }
+            }
         }.distinct()
 
         urls.forEach { imageUrl ->

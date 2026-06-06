@@ -46,6 +46,7 @@ object EmbyHomeCache {
             .put("resumeItems", resumeItems.toJsonArray { it.toJson() })
             .put("latestTitle", latestTitle)
             .put("latestItems", latestItems.toJsonArray { it.toJson() })
+            .put("librarySections", librarySections.toJsonArray { it.toJson() })
     }
 
     private fun EmbyLibrarySummary.toJson(): JSONObject {
@@ -55,6 +56,13 @@ object EmbyHomeCache {
             .put("collectionType", collectionType)
             .put("itemCount", itemCount)
             .put("imageUrl", imageUrl)
+    }
+
+    private fun EmbyLibrarySection.toJson(): JSONObject {
+        return JSONObject()
+            .put("libraryId", libraryId)
+            .put("title", title)
+            .put("items", items.toJsonArray { it.toJson() })
     }
 
     private fun EmbyMediaItem.toJson(): JSONObject {
@@ -71,7 +79,8 @@ object EmbyHomeCache {
             libraries = optJSONArray("libraries").toList { it.toLibrarySummary() },
             resumeItems = optJSONArray("resumeItems").toList { it.toMediaItem() },
             latestTitle = optString("latestTitle", "最新媒体"),
-            latestItems = optJSONArray("latestItems").toList { it.toMediaItem() }
+            latestItems = optJSONArray("latestItems").toList { it.toMediaItem() },
+            librarySections = optJSONArray("librarySections").toList { it.toLibrarySection() }
         )
     }
 
@@ -82,6 +91,14 @@ object EmbyHomeCache {
             collectionType = optString("collectionType"),
             itemCount = optInt("itemCount", 0),
             imageUrl = optString("imageUrl")
+        )
+    }
+
+    private fun JSONObject.toLibrarySection(): EmbyLibrarySection {
+        return EmbyLibrarySection(
+            libraryId = optString("libraryId"),
+            title = optString("title", "媒体库"),
+            items = optJSONArray("items").toList { it.toMediaItem() }
         )
     }
 

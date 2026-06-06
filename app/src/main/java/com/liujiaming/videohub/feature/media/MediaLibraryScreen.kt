@@ -248,6 +248,8 @@ private fun ConnectedMediaLibraryContent(
         SectionTitle("继续观看")
         HorizontalMediaRow(home.resumeItems, emptyText = "暂无继续观看")
 
+        MediaLibrarySections(home)
+        if (false) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -271,6 +273,30 @@ private fun ConnectedMediaLibraryContent(
         }
 
         MediaGrid(home.latestItems)
+        }
+    }
+}
+
+@Composable
+private fun MediaLibrarySections(home: EmbyMediaHome) {
+    val sections = if (home.librarySections.isNotEmpty()) {
+        home.librarySections
+    } else {
+        home.libraries.map { library ->
+            com.liujiaming.videohub.feature.emby.EmbyLibrarySection(
+                libraryId = library.id,
+                title = library.name,
+                items = emptyList()
+            )
+        }
+    }
+
+    sections.forEach { section ->
+        SectionTitle(section.title)
+        HorizontalMediaRow(
+            items = section.items,
+            emptyText = "暂无${section.title}内容"
+        )
     }
 }
 
@@ -633,7 +659,17 @@ private fun EmbyMediaHome.sanitized(): EmbyMediaHome {
         latestTitle = latestTitle.ifBlank { libraries.firstOrNull()?.name ?: "最新媒体" },
         latestItems = latestItems
             .filter { it.id.isNotBlank() || it.name.isNotBlank() }
-            .take(30)
+            .take(30),
+        librarySections = librarySections
+            .filter { it.libraryId.isNotBlank() || it.title.isNotBlank() }
+            .take(20)
+            .map { section ->
+                section.copy(
+                    items = section.items
+                        .filter { it.id.isNotBlank() || it.name.isNotBlank() }
+                        .take(20)
+                )
+            }
     )
 }
 

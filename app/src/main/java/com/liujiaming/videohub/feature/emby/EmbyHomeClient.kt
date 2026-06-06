@@ -122,8 +122,8 @@ object EmbyHomeClient {
                 query = mapOf(
                     "ParentId" to libraryId,
                     "Recursive" to "true",
-                    "IncludeItemTypes" to "Movie,Series,Episode,Video",  // 包含电影、剧集、集、视频
-                    "Limit" to "10",
+                    "IncludeItemTypes" to "Movie,Series,Episode,Video,Folder",
+                    "Limit" to "60",
                     "SortBy" to "DateCreated",     // 按创建时间排序
                     "SortOrder" to "Descending"     // 降序，最新的在前
                 )
@@ -194,11 +194,21 @@ object EmbyHomeClient {
      */
     private fun JSONObject.toMediaItem(session: EmbyAuthSession): EmbyMediaItem {
         val id = optString("Id")
+        val userData = optJSONObject("UserData")
+        val runtimeTicks = optLong("RunTimeTicks", 0L).takeIf { it > 0L }
+        val playbackTicks = userData?.optLong("PlaybackPositionTicks", 0L) ?: 0L
+        val playbackProgress = if (runtimeTicks != null && playbackTicks > 0L) {
+            (playbackTicks.toFloat() / runtimeTicks.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
         return EmbyMediaItem(
             id = id,
             name = optString("Name", "未命名"),
             type = optString("Type"),
-            imageUrl = if (id.isBlank()) "" else imageUrl(session, id, 360)
+            imageUrl = if (id.isBlank()) "" else imageUrl(session, id, 360),
+            playbackProgress = playbackProgress,
+            played = userData?.optBoolean("Played", false) ?: false
         )
     }
 
@@ -348,5 +358,7 @@ data class EmbyMediaItem(
     val id: String,
     val name: String,
     val type: String,
-    val imageUrl: String
+    val imageUrl: String,
+    val playbackProgress: Float = 0f,
+    val played: Boolean = false
 )

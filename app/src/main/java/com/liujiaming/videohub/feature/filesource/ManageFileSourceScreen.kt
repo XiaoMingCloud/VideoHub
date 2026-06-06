@@ -100,7 +100,12 @@ private val storageSections = listOf(
  * @param onBackClick 返回上一页的回调
  */
 @Composable
-fun ManageFileSourceScreen(onBackClick: () -> Unit) {
+fun ManageFileSourceScreen(
+    onBackClick: () -> Unit,
+    onLocalClick: () -> Unit,
+    onSmbClick: () -> Unit,
+    onWebDavClick: () -> Unit
+) {
     Scaffold(containerColor = PageBackground) { paddingValues ->
         Column(
             modifier = Modifier
@@ -123,7 +128,12 @@ fun ManageFileSourceScreen(onBackClick: () -> Unit) {
                     if (index > 0) {
                         Spacer(modifier = Modifier.height(14.dp))  // 分区之间的间距
                     }
-                    StorageSectionCard(section)
+                    StorageSectionCard(
+                        section = section,
+                        onLocalClick = onLocalClick,
+                        onSmbClick = onSmbClick,
+                        onWebDavClick = onWebDavClick
+                    )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -174,7 +184,12 @@ private fun AddStorageTopBar(onBackClick: () -> Unit) {
  * @param section 存储分区数据
  */
 @Composable
-private fun StorageSectionCard(section: StorageSection) {
+private fun StorageSectionCard(
+    section: StorageSection,
+    onLocalClick: () -> Unit,
+    onSmbClick: () -> Unit,
+    onWebDavClick: () -> Unit
+) {
     Column {
         // 分区标题（如"本地存储"、"网络存储"、"云盘存储"）
         Text(
@@ -194,7 +209,15 @@ private fun StorageSectionCard(section: StorageSection) {
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             section.options.forEachIndexed { index, option ->
-                StorageOptionRow(option)
+                StorageOptionRow(
+                    option = option,
+                    onClick = when (option.title) {
+                        "本地目录" -> onLocalClick
+                        "SMB" -> onSmbClick
+                        "WebDAV / Alist" -> onWebDavClick
+                        else -> ({ })
+                    }
+                )
                 // 非最后一项时显示分割线
                 if (index != section.options.lastIndex) {
                     AppListDivider()
@@ -211,11 +234,14 @@ private fun StorageSectionCard(section: StorageSection) {
  * @param option 存储选项数据
  */
 @Composable
-private fun StorageOptionRow(option: StorageOption) {
+private fun StorageOptionRow(
+    option: StorageOption,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }  // 点击事件（待实现具体逻辑）
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -11,11 +11,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.platform.LocalContext
 import com.liujiaming.videohub.feature.emby.AddEmbyScreen
+import com.liujiaming.videohub.feature.filesource.AddLocalStorageScreen
+import com.liujiaming.videohub.feature.filesource.AddSmbStorageScreen
+import com.liujiaming.videohub.feature.filesource.AddWebDavStorageScreen
 import com.liujiaming.videohub.feature.filesource.FileSourceScreen
 import com.liujiaming.videohub.feature.filesource.FileSourceTutorialScreen
 import com.liujiaming.videohub.feature.filesource.ManageFileSourceScreen
 import com.liujiaming.videohub.feature.fnos.AddFnosScreen
 import com.liujiaming.videohub.feature.jellyfin.AddJellyfinScreen
+import com.liujiaming.videohub.feature.media.MediaLibraryDetailScreen
 import com.liujiaming.videohub.feature.media.MediaLibraryScreen
 import com.liujiaming.videohub.feature.settings.AboutScreen
 import com.liujiaming.videohub.feature.settings.DownloadSettingsScreen
@@ -43,6 +47,7 @@ fun VideoHubApp() {
     val currentScreen = backStack.last()
     // 记录上一次按下返回键的时间戳，用于双击退出判断
     var lastExitPressTime by remember { mutableStateOf(0L) }
+    var selectedLibraryId by remember { mutableStateOf("") }
 
     /**
      * 导航到指定页面，将新页面压入返回栈。
@@ -103,7 +108,16 @@ fun VideoHubApp() {
             onAddServerClick = { navigateTo(VideoHubScreen.ServerList) },
             onFileClick = { switchRoot(VideoHubScreen.FileSource) },
             onServerClick = { switchRoot(VideoHubScreen.ServerList) },
-            onSettingsClick = { switchRoot(VideoHubScreen.Settings) }
+            onSettingsClick = { switchRoot(VideoHubScreen.Settings) },
+            onLibraryViewAllClick = { libraryId ->
+                selectedLibraryId = libraryId
+                navigateTo(VideoHubScreen.MediaLibraryDetail)
+            }
+        )
+
+        VideoHubScreen.MediaLibraryDetail -> MediaLibraryDetailScreen(
+            libraryId = selectedLibraryId,
+            onBackClick = ::goBack
         )
 
         // 影视服务器列表页面
@@ -148,6 +162,21 @@ fun VideoHubApp() {
 
         // 管理文件源页面
         VideoHubScreen.ManageFileSource -> ManageFileSourceScreen(
+            onBackClick = ::goBack,
+            onLocalClick = { navigateTo(VideoHubScreen.AddLocalStorage) },
+            onSmbClick = { navigateTo(VideoHubScreen.AddSmbStorage) },
+            onWebDavClick = { navigateTo(VideoHubScreen.AddWebDavStorage) }
+        )
+
+        VideoHubScreen.AddLocalStorage -> AddLocalStorageScreen(
+            onBackClick = ::goBack
+        )
+
+        VideoHubScreen.AddSmbStorage -> AddSmbStorageScreen(
+            onBackClick = ::goBack
+        )
+
+        VideoHubScreen.AddWebDavStorage -> AddWebDavStorageScreen(
             onBackClick = ::goBack
         )
 
@@ -209,6 +238,7 @@ fun VideoHubApp() {
 private enum class VideoHubScreen {
     /** 媒体库页面（首页） */
     MediaLibrary,
+    MediaLibraryDetail,
     /** 影视服务器列表页面 */
     ServerList,
     /** 添加 Emby 服务器页面 */
@@ -223,6 +253,9 @@ private enum class VideoHubScreen {
     FileSourceTutorial,
     /** 管理文件源页面 */
     ManageFileSource,
+    AddLocalStorage,
+    AddSmbStorage,
+    AddWebDavStorage,
     /** 设置主页面 */
     Settings,
     /** 通用设置页面 */

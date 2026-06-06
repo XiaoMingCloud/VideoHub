@@ -1,9 +1,10 @@
 package com.liujiaming.videohub.feature.server
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,12 +26,17 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +61,7 @@ import com.liujiaming.videohub.ui.theme.VideoHubTheme
 @Composable
 fun MediaServerScreen(
     onEmbyClick: () -> Unit = {},
+    onEditConnectedEmbyClick: () -> Unit = onEmbyClick,
     onJellyfinClick: () -> Unit = {},
     onFnosClick: () -> Unit = {},
     onMediaClick: () -> Unit = {},
@@ -62,7 +69,7 @@ fun MediaServerScreen(
     onSettingsClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val embySession = remember { EmbySessionStore.load(context) }
+    var embySession by remember { mutableStateOf(EmbySessionStore.load(context)) }
 
     Scaffold(
         containerColor = BackgroundGray,
@@ -87,15 +94,28 @@ fun MediaServerScreen(
             TopHeader()
             Spacer(modifier = Modifier.height(24.dp))
 
-            if (embySession != null) {
+            embySession?.let { session ->
                 Text(
                     text = "已连接",
                     color = TextGray,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                    letterSpacing = 0.sp
                 )
 
-                ConnectedEmbyCard(embySession)
+                ConnectedEmbyCard(
+                    session = session,
+                    onEditClick = onEditConnectedEmbyClick,
+                    onDeleteClick = {
+                        EmbySessionStore.clear(context)
+                        embySession = null
+                        Toast.makeText(context, "已删除 Emby 连接", Toast.LENGTH_SHORT).show()
+                    },
+                    onMoveToTopClick = {
+                        EmbySessionStore.moveToTop(context)
+                        Toast.makeText(context, "已移至顶部", Toast.LENGTH_SHORT).show()
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -104,7 +124,8 @@ fun MediaServerScreen(
                 text = "连接到...",
                 color = TextGray,
                 fontSize = 14.sp,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                letterSpacing = 0.sp
             )
 
             Card(
@@ -128,7 +149,14 @@ fun MediaServerScreen(
 }
 
 @Composable
-private fun ConnectedEmbyCard(session: EmbyAuthSession) {
+private fun ConnectedEmbyCard(
+    session: EmbyAuthSession,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onMoveToTopClick: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -142,7 +170,6 @@ private fun ConnectedEmbyCard(session: EmbyAuthSession) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             EmbyAvatar(session)
-
             Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
@@ -162,6 +189,43 @@ private fun ConnectedEmbyCard(session: EmbyAuthSession) {
                     fontSize = 13.sp,
                     letterSpacing = 0.sp
                 )
+            }
+
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "更多操作",
+                        tint = TextGray
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("编辑") },
+                        onClick = {
+                            menuExpanded = false
+                            onEditClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("删除") },
+                        onClick = {
+                            menuExpanded = false
+                            onDeleteClick()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("移至顶部") },
+                        onClick = {
+                            menuExpanded = false
+                            onMoveToTopClick()
+                        }
+                    )
+                }
             }
         }
     }

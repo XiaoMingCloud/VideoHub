@@ -35,13 +35,32 @@ import com.liujiaming.videohub.ui.theme.ActiveGreen
 import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.TextGray
 
+/**
+ * 底部导航栏项目枚举，定义四个主要功能模块。
+ */
 enum class BottomNavItem {
+    /** 媒体库模块 */
     Media,
+    /** 文件源模块 */
     File,
+    /** 影视服务器模块 */
     Server,
+    /** 设置模块 */
     Settings
 }
 
+/**
+ * 悬浮式底部导航栏组件。
+ * 采用圆形胶囊形状设计，带有阴影效果，悬浮在页面底部。
+ * 包含四个导航项：媒体库、文件源、影视服务器、设置。
+ * 当前激活的导航项以绿色高亮显示。
+ *
+ * @param activeItem 当前选中的导航项
+ * @param onMediaClick 点击“媒体库”时的回调
+ * @param onFileClick 点击“文件源”时的回调
+ * @param onServerClick 点击“影视服务器”时的回调
+ * @param onSettingsClick 点击“设置”时的回调
+ */
 @Composable
 fun FloatingBottomNav(
     activeItem: BottomNavItem,
@@ -50,28 +69,31 @@ fun FloatingBottomNav(
     onServerClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    // 外层容器，填充最大宽度并适配导航栏高度，居中对齐导航栏内容
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
+            .navigationBarsPadding()  // 适配系统导航栏高度，避免遮挡
             .padding(horizontal = 16.dp, vertical = 8.9.dp),
         contentAlignment = Alignment.Center
     ) {
+        // 导航栏主体行，应用圆形裁剪、阴影和背景色
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .shadow(
-                    elevation = 14.dp,
-                    shape = CircleShape,
-                    ambientColor = Color.Black.copy(alpha = 0.08f),
-                    spotColor = Color.Black.copy(alpha = 0.12f)
+                    elevation = 14.dp,             // 阴影高度，营造悬浮效果
+                    shape = CircleShape,            // 圆形胶囊形状
+                    ambientColor = Color.Black.copy(alpha = 0.08f),  // 环境光阴影颜色
+                    spotColor = Color.Black.copy(alpha = 0.12f)      // 聚光阴影颜色
                 )
-                .clip(CircleShape)
-                .background(CardBackground)
+                .clip(CircleShape)                  // 圆形裁剪
+                .background(CardBackground)         // 使用主题感知的卡片背景色
                 .padding(horizontal = 8.dp, vertical = 8.9.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.SpaceEvenly,  // 导航项均匀分布
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // 渲染四个导航项，根据 activeItem 判断当前选中状态
             NavItem("媒体库", Icons.Default.Home, activeItem == BottomNavItem.Media, onMediaClick)
             NavItem("文件源", Icons.Default.Folder, activeItem == BottomNavItem.File, onFileClick)
             NavItem("影视服务器", Icons.Default.VideoLibrary, activeItem == BottomNavItem.Server, onServerClick)
@@ -80,6 +102,15 @@ fun FloatingBottomNav(
     }
 }
 
+/**
+ * 单个导航项组件，由图标和文字纵向排列组成。
+ * 选中状态以 [ActiveGreen] 绿色显示，未选中状态以 [TextGray] 灰色显示。
+ *
+ * @param title 导航项文字标签
+ * @param icon 导航项图标
+ * @param isActive 是否为当前选中状态
+ * @param onClick 点击时的回调函数
+ */
 @Composable
 private fun NavItem(
     title: String,
@@ -87,29 +118,33 @@ private fun NavItem(
     isActive: Boolean,
     onClick: () -> Unit = {}
 ) {
+    // 根据选中状态决定颜色：选中为绿色，未选中为灰色
     val color = if (isActive) ActiveGreen else TextGray
 
+    // 导航项容器：固定宽度 72dp，圆角裁剪，点击响应
     Column(
         modifier = Modifier
             .width(72.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(18.dp))  // 圆角裁剪，增强点击反馈
+            .clickable(onClick = onClick)        // 点击事件
             .padding(vertical = 3.6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 导航项图标
         Icon(
             imageVector = icon,
-            contentDescription = title,
-            tint = color,
-            modifier = Modifier.size(24.dp)
+            contentDescription = title,           // 无障碍描述文字
+            tint = color,                          // 图标着色
+            modifier = Modifier.size(24.dp)        // 图标尺寸 24dp
         )
-        Spacer(modifier = Modifier.height(3.6.dp))
+        Spacer(modifier = Modifier.height(3.6.dp))  // 图标与文字间距
+        // 导航项文字标签
         Text(
             text = title,
-            color = color,
-            fontSize = 10.sp,
-            letterSpacing = 0.sp,
-            maxLines = 1
+            color = color,                          // 文字颜色与图标一致
+            fontSize = 10.sp,                       // 小字号
+            letterSpacing = 0.sp,                   // 无字间距
+            maxLines = 1                            // 单行显示
         )
     }
 }

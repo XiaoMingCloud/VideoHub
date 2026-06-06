@@ -1,8 +1,15 @@
 package com.liujiaming.videohub.feature.settings
 
+/**
+ * 元数据语言选项定义。
+ * 维护中文名称到元数据格式（如 "Chinese(Simplified)-简体中文"）的映射，
+ * 用于设置页面中的元数据语言选择。
+ */
 object MetadataLanguageOptions {
+    /** 自动模式选项 */
     const val AUTO_SYSTEM_LANGUAGE = "Auto-自动"
 
+    /** 中文语言名称到元数据格式的映射表 */
     private val nativeToMetadataLanguage = linkedMapOf(
         "简体中文" to "Chinese(Simplified)-简体中文",
         "繁体中文" to "Chinese(Traditional)-繁体中文",
@@ -43,8 +50,16 @@ object MetadataLanguageOptions {
         "威尔士语" to "Welsh-Cymraeg"
     )
 
+    /** 包含自动选项和所有元数据语言的完整列表 */
     val languages = listOf(AUTO_SYSTEM_LANGUAGE) + nativeToMetadataLanguage.values
 
+    /**
+     * 标准化元数据语言值。
+     * 将普通语言名称转换为元数据格式，无法识别时回退为自动模式。
+     *
+     * @param value 输入的语言值
+     * @return 标准化后的元数据语言值
+     */
     fun normalize(value: String): String {
         return when {
             value == LanguageOptions.AUTO_SYSTEM_LANGUAGE -> AUTO_SYSTEM_LANGUAGE

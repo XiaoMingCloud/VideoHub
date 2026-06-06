@@ -32,6 +32,13 @@ import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+/**
+ * 文件源使用教程页面。
+ * 展示文件源功能的详细说明，包括单文件操作和多文件操作的教程内容。
+ * 采用卡片式布局，支持垂直滚动。
+ *
+ * @param onBackClick 返回上一页的回调
+ */
 @Composable
 fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
     Scaffold(
@@ -43,14 +50,17 @@ fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
                 .padding(paddingValues)
                 .statusBarsPadding()
         ) {
+            // 顶部导航栏，含返回按钮和标题
             TutorialTopBar(onBackClick)
 
+            // 教程正文内容，支持垂直滚动
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp)
             ) {
+                // 更新时间标签
                 Text(
                     text = "更新时间 Dec 11, 2024",
                     color = TextGray,
@@ -59,6 +69,7 @@ fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp)
                 )
 
+                // 教程概述说明
                 Text(
                     text = "文件源页面主要用于管理本地、网盘、网络共享上的影片文件。下文中所有的长按操作均为移动端版本，对应桌面端版本为鼠标右击操作。",
                     color = PrimaryText,
@@ -68,6 +79,7 @@ fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
                     modifier = Modifier.padding(top = 8.dp)
                 )
 
+                // 单文件操作教程卡片
                 TutorialCard(title = "单文件操作") {
                     TutorialParagraph(
                         title = "重新扫描文件",
@@ -87,6 +99,7 @@ fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
                     )
                 }
 
+                // 多文件操作教程卡片
                 TutorialCard(title = "多文件操作") {
                     TutorialBody("1. 进入文件源页面选择文件夹。")
                     TutorialBody("2. 点击右上角三个点，选择编辑。")
@@ -99,6 +112,12 @@ fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 教程页面的顶部导航栏。
+ * 左侧显示返回按钮，居中显示"使用文件源"标题。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun TutorialTopBar(onBackClick: () -> Unit) {
     Box(
@@ -128,6 +147,13 @@ private fun TutorialTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 教程卡片容器，带圆角和背景色。
+ * 用于将相关教程内容分组展示。
+ *
+ * @param title 卡片标题
+ * @param content 卡片内部的 Composable 内容
+ */
 @Composable
 private fun TutorialCard(
     title: String,
@@ -142,6 +168,7 @@ private fun TutorialCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(17.75.dp)) {
+            // 卡片标题
             Text(
                 text = title,
                 color = PrimaryText,
@@ -155,6 +182,12 @@ private fun TutorialCard(
     }
 }
 
+/**
+ * 教程段落组件，由加粗标题和正文内容组成。
+ *
+ * @param title 段落标题（加粗显示）
+ * @param body 段落正文内容
+ */
 @Composable
 private fun TutorialParagraph(
     title: String,
@@ -171,6 +204,11 @@ private fun TutorialParagraph(
     TutorialBody(body)
 }
 
+/**
+ * 教程正文文本组件，用于展示单行或多行说明文字。
+ *
+ * @param text 正文文本内容
+ */
 @Composable
 private fun TutorialBody(text: String) {
     Text(

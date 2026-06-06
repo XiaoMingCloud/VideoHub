@@ -45,9 +45,27 @@ import com.liujiaming.videohub.ui.theme.BackgroundGray
 import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 
+// ========================================================================
+// 字幕和音轨设置主页面
+// ========================================================================
+
+/**
+ * 字幕和音轨设置页面
+ *
+ * 包含以下设置项：
+ * - **自动加载外挂字幕规则**：选择外挂字幕匹配规则
+ * - **自动加载内置字幕**：开关设置
+ * - **自动加载内置字幕语言**：选择语言
+ * - **在线字幕搜索语言**：选择语言
+ * - **默认音轨语言**：选择语言
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
+    // 外挂字幕规则选择弹窗
     val showExternalSubtitleRuleDialog = remember { mutableStateOf(false) }
+    // 语言选择弹窗的目标类型（内置字幕/在线字幕/默认音轨）
     val languageDialogTarget = remember { mutableStateOf<LanguageDialogTarget?>(null) }
 
     Scaffold(containerColor = BackgroundGray) { paddingValues ->
@@ -66,6 +84,7 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // === 字幕设置卡片 ===
                 SubtitleTrackCard {
                     SettingValueItem(
                         title = "自动加载外挂字幕规则",
@@ -94,6 +113,7 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // === 音轨设置卡片 ===
                 SubtitleTrackCard {
                     SettingValueItem(
                         title = "默认音轨语言",
@@ -107,6 +127,7 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
         }
     }
 
+    // 外挂字幕规则选择弹窗
     if (showExternalSubtitleRuleDialog.value) {
         OptionSelectionDialog(
             title = "自动加载外挂字幕规则",
@@ -120,6 +141,7 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
         )
     }
 
+    // 语言选择弹窗（根据目标类型动态显示不同内容）
     languageDialogTarget.value?.let { target ->
         LanguageSelectionDialog(
             title = target.title,
@@ -141,6 +163,17 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
     }
 }
 
+// ========================================================================
+// 辅助组件
+// ========================================================================
+
+/**
+ * 字幕和音轨设置页面顶部导航栏
+ *
+ * 居中显示"字幕和音轨"标题，左侧放置返回按钮。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun SubtitleTrackTopBar(onBackClick: () -> Unit) {
     Box(
@@ -170,6 +203,13 @@ private fun SubtitleTrackTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 字幕和音轨设置卡片容器
+ *
+ * 圆角卡片样式，用于包裹设置项列表。
+ *
+ * @param content 卡片内容组合
+ */
 @Composable
 private fun SubtitleTrackCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -184,6 +224,7 @@ private fun SubtitleTrackCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/** 字幕和音轨设置项之间的分隔线 */
 @Composable
 private fun ItemDivider() {
     Divider(
@@ -193,6 +234,16 @@ private fun ItemDivider() {
     )
 }
 
+/**
+ * 值显示型设置项
+ *
+ * 左侧显示标题，右侧以绿色文本显示当前值，点击可触发选择弹窗。
+ * 标题和值均限制为单行显示，值过长时以省略号截断。
+ *
+ * @param title 设置项标题
+ * @param value 当前设置值文本
+ * @param onClick 点击回调（默认空操作）
+ */
 @Composable
 private fun SettingValueItem(
     title: String,
@@ -232,6 +283,13 @@ private fun SettingValueItem(
     }
 }
 
+/**
+ * 将外挂字幕规则值转换为简短的显示文本
+ *
+ * 对于较长的规则名（如"同目录下的同名字幕"），截断为"同目录...字幕"以节省空间。
+ *
+ * @return 截断后的显示文本
+ */
 private fun String.toExternalSubtitleRuleDisplayText(): String {
     return when (this) {
         "同目录下的同名字幕",
@@ -240,6 +298,17 @@ private fun String.toExternalSubtitleRuleDisplayText(): String {
     }
 }
 
+/**
+ * 选项选择弹窗
+ *
+ * 以列表形式展示外挂字幕规则等选项，当前选中项以绿色高亮显示。
+ *
+ * @param title 弹窗标题
+ * @param options 可选项列表
+ * @param selectedOption 当前选中的选项
+ * @param onOptionSelected 选择选项后的回调
+ * @param onDismiss 关闭弹窗回调
+ */
 @Composable
 private fun OptionSelectionDialog(
     title: String,
@@ -261,6 +330,7 @@ private fun OptionSelectionDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // 遍历所有选项
                 options.forEach { option ->
                     Text(
                         text = option,
@@ -280,6 +350,17 @@ private fun OptionSelectionDialog(
     )
 }
 
+/**
+ * 语言选择弹窗
+ *
+ * 展示常用语言列表，当前选中语言以绿色高亮显示。
+ * 语言列表来源于 [LanguageOptions.commonLanguages]。
+ *
+ * @param title 弹窗标题
+ * @param selectedLanguage 当前选中的语言
+ * @param onLanguageSelected 选择语言后的回调
+ * @param onDismiss 关闭弹窗回调
+ */
 @Composable
 private fun LanguageSelectionDialog(
     title: String,
@@ -305,6 +386,7 @@ private fun LanguageSelectionDialog(
                     .heightIn(max = 420.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // 遍历常用语言列表
                 LanguageOptions.commonLanguages.forEach { language ->
                     Text(
                         text = language,
@@ -324,12 +406,31 @@ private fun LanguageSelectionDialog(
     )
 }
 
+/**
+ * 语言选择弹窗目标枚举
+ *
+ * 用于标识当前弹窗是在设置哪种语言（内置字幕/在线字幕/默认音轨）。
+ *
+ * @property title 弹窗标题文本
+ */
 private enum class LanguageDialogTarget(val title: String) {
+    /** 自动加载内置字幕语言 */
     BuiltInSubtitle("自动加载内置字幕语言"),
+    /** 在线字幕搜索语言 */
     OnlineSubtitle("在线字幕搜索语言"),
+    /** 默认音轨语言 */
     DefaultAudio("默认音轨语言")
 }
 
+/**
+ * 开关型设置项
+ *
+ * 左侧显示标题文本，右侧显示 Switch 开关。
+ *
+ * @param title 设置项标题
+ * @param checked 当前开关状态
+ * @param onCheckedChange 开关状态变更回调
+ */
 @Composable
 private fun SettingSwitchItem(
     title: String,

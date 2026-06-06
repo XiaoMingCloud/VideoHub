@@ -41,10 +41,29 @@ import com.liujiaming.videohub.ui.theme.BackgroundGray
 import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 
+// ========================================================================
+// 播放器界面设置主页面
+// ========================================================================
+
+/**
+ * 播放器界面设置页面
+ *
+ * 包含以下设置项：
+ * - **自动隐藏播放控制面板**：选择面板自动隐藏的时长
+ * - **进度条右侧时间**：选择时间显示模式
+ * - **长按倍速播放**：选择长按时的播放倍速
+ * - **双击屏幕两侧快进/快退**：开关设置
+ * - **默认横向显示**：开关设置
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
+    // 自动隐藏控制面板时长选择弹窗
     val showAutoHideControlPanelDialog = remember { mutableStateOf(false) }
+    // 进度条右侧时间显示模式弹窗
     val showProgressRightTimeDialog = remember { mutableStateOf(false) }
+    // 长按倍速播放速度选择弹窗
     val showLongPressSpeedDialog = remember { mutableStateOf(false) }
 
     Scaffold(containerColor = BackgroundGray) { paddingValues ->
@@ -63,6 +82,7 @@ fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // === 播放器界面设置卡片 ===
                 PlayerInterfaceCard {
                     SettingValueItem(
                         title = "自动隐藏播放控制面板",
@@ -100,6 +120,7 @@ fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
         }
     }
 
+    // 自动隐藏控制面板时长弹窗
     if (showAutoHideControlPanelDialog.value) {
         PlayerInterfaceOptionDialog(
             title = "自动隐藏播放控制面板",
@@ -113,6 +134,7 @@ fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
         )
     }
 
+    // 进度条右侧时间显示模式弹窗
     if (showProgressRightTimeDialog.value) {
         PlayerInterfaceOptionDialog(
             title = "进度条右侧时间",
@@ -126,6 +148,7 @@ fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
         )
     }
 
+    // 长按倍速播放速度选择弹窗
     if (showLongPressSpeedDialog.value) {
         PlayerInterfaceOptionDialog(
             title = "长按倍速播放",
@@ -140,6 +163,17 @@ fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
     }
 }
 
+// ========================================================================
+// 辅助组件
+// ========================================================================
+
+/**
+ * 播放器界面设置页面顶部导航栏
+ *
+ * 居中显示"播放器界面"标题，左侧放置返回按钮。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun PlayerInterfaceTopBar(onBackClick: () -> Unit) {
     Box(
@@ -169,6 +203,13 @@ private fun PlayerInterfaceTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 播放器界面设置卡片容器
+ *
+ * 圆角卡片样式，用于包裹设置项列表。
+ *
+ * @param content 卡片内容组合
+ */
 @Composable
 private fun PlayerInterfaceCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -183,6 +224,7 @@ private fun PlayerInterfaceCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/** 播放器界面设置项之间的分隔线 */
 @Composable
 private fun ItemDivider() {
     Divider(
@@ -192,6 +234,15 @@ private fun ItemDivider() {
     )
 }
 
+/**
+ * 值显示型设置项
+ *
+ * 左侧显示标题，右侧以绿色文本显示当前值，点击可触发选择弹窗。
+ *
+ * @param title 设置项标题
+ * @param value 当前设置值文本
+ * @param onClick 点击回调（默认空操作）
+ */
 @Composable
 private fun SettingValueItem(
     title: String,
@@ -222,6 +273,17 @@ private fun SettingValueItem(
     }
 }
 
+/**
+ * 播放器界面选项选择弹窗
+ *
+ * 以列表形式展示选项，当前选中项以绿色高亮显示。
+ *
+ * @param title 弹窗标题
+ * @param options 可选项列表
+ * @param selectedOption 当前选中的选项
+ * @param onOptionSelected 选择选项后的回调
+ * @param onDismiss 关闭弹窗回调
+ */
 @Composable
 private fun PlayerInterfaceOptionDialog(
     title: String,
@@ -243,6 +305,7 @@ private fun PlayerInterfaceOptionDialog(
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                // 遍历所有选项
                 options.forEach { option ->
                     Text(
                         text = option,
@@ -262,6 +325,15 @@ private fun PlayerInterfaceOptionDialog(
     )
 }
 
+/**
+ * 开关型设置项
+ *
+ * 左侧显示标题文本，右侧显示 Switch 开关。
+ *
+ * @param title 设置项标题
+ * @param checked 当前开关状态
+ * @param onCheckedChange 开关状态变更回调
+ */
 @Composable
 private fun SettingSwitchItem(
     title: String,

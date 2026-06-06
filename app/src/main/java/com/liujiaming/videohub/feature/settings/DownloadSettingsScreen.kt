@@ -43,13 +43,28 @@ import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+// ========================================================================
+// 下载管理页面
+// ========================================================================
+
+/**
+ * 下载设置页面
+ *
+ * 展示下载文件列表，包含：
+ * - "正在下载" 和 "已下载" 两个标签页
+ * - 空状态提示（当前无下载文件）
+ * - 底部磁盘空间使用指示器
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 fun DownloadSettingsScreen(onBackClick: () -> Unit) {
+    // 当前选中的标签页索引（0=正在下载，1=已下载）
     var selectedTab by remember { mutableStateOf(0) }
 
     Scaffold(
         containerColor = PageBackground,
-        bottomBar = { DiskSpaceIndicator() }
+        bottomBar = { DiskSpaceIndicator() } // 底部磁盘空间指示器
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -57,12 +72,15 @@ fun DownloadSettingsScreen(onBackClick: () -> Unit) {
                 .padding(paddingValues)
                 .statusBarsPadding()
         ) {
+            // 顶部导航栏（含"编辑"按钮）
             DownloadTopBar(onBackClick)
+            // 标签页切换
             DownloadTabs(
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it }
             )
 
+            // 内容区域 - 当前显示空状态
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -75,6 +93,17 @@ fun DownloadSettingsScreen(onBackClick: () -> Unit) {
     }
 }
 
+// ========================================================================
+// 辅助组件
+// ========================================================================
+
+/**
+ * 下载页面顶部导航栏
+ *
+ * 居中显示"下载"标题，左侧返回按钮，右侧"编辑"操作按钮。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun DownloadTopBar(onBackClick: () -> Unit) {
     Box(
@@ -102,6 +131,7 @@ private fun DownloadTopBar(onBackClick: () -> Unit) {
             letterSpacing = 0.sp
         )
 
+        // 右侧"编辑"按钮
         Text(
             text = "编辑",
             color = ActiveGreen,
@@ -115,6 +145,14 @@ private fun DownloadTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 下载标签页切换组件
+ *
+ * 包含"正在下载"和"已下载"两个标签，选中标签底部有绿色指示条。
+ *
+ * @param selectedTab 当前选中标签索引
+ * @param onTabSelected 标签选择回调
+ */
 @Composable
 private fun DownloadTabs(
     selectedTab: Int,
@@ -136,6 +174,7 @@ private fun DownloadTabs(
                         .clickable { onTabSelected(index) },
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // 标签文字
                     Box(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.Center
@@ -149,6 +188,7 @@ private fun DownloadTabs(
                         )
                     }
 
+                    // 底部指示条（选中时显示绿色）
                     Box(
                         modifier = Modifier
                             .height(3.dp)
@@ -160,6 +200,7 @@ private fun DownloadTabs(
             }
         }
 
+        // 标签页底部分隔线
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -169,12 +210,18 @@ private fun DownloadTabs(
     }
 }
 
+/**
+ * 空下载状态占位组件
+ *
+ * 当没有下载文件时，显示文件夹图标和提示文字。
+ */
 @Composable
 private fun EmptyDownloadState() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.padding(bottom = 28.dp)
     ) {
+        // 文件夹图标（根据深色/浅色模式切换颜色）
         Icon(
             imageVector = Icons.Default.Folder,
             contentDescription = null,
@@ -192,8 +239,14 @@ private fun EmptyDownloadState() {
     }
 }
 
+/**
+ * 底部磁盘空间指示器
+ *
+ * 显示设备磁盘使用情况的进度条和文字信息（已用/可用）。
+ */
 @Composable
 private fun DiskSpaceIndicator() {
+    // 读取磁盘空间信息（仅在首次组合时计算）
     val diskSpace = remember { readDeviceDiskSpace() }
 
     Column(
@@ -202,6 +255,7 @@ private fun DiskSpaceIndicator() {
             .background(PageBackground)
             .padding(horizontal = 20.dp, vertical = 15.85.dp)
     ) {
+        // 磁盘使用进度条
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -209,6 +263,7 @@ private fun DiskSpaceIndicator() {
                 .clip(RoundedCornerShape(2.dp))
                 .background(DividerGray)
         ) {
+            // 已使用部分（绿色填充）
             Box(
                 modifier = Modifier
                     .fillMaxWidth(diskSpace.usedRatio)
@@ -217,6 +272,7 @@ private fun DiskSpaceIndicator() {
             )
         }
 
+        // 已使用/可用空间文字
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -243,12 +299,31 @@ private fun DiskSpaceIndicator() {
     }
 }
 
+// ========================================================================
+// 数据模型与工具函数
+// ========================================================================
+
+/**
+ * 磁盘空间数据模型
+ *
+ * @property usedText 已使用空间的格式化文本（如 "25.30 GB"）
+ * @property availableText 可用空间的格式化文本（如 "100.50 GB"）
+ * @property usedRatio 已使用空间占比（0.0 ~ 1.0），用于进度条显示
+ */
 private data class DiskSpace(
     val usedText: String,
     val availableText: String,
     val usedRatio: Float
 )
 
+/**
+ * 读取设备磁盘空间信息
+ *
+ * 通过 [StatFs] 获取设备数据目录的总容量、可用容量，
+ * 计算已使用容量和使用比例。
+ *
+ * @return 磁盘空间数据对象
+ */
 private fun readDeviceDiskSpace(): DiskSpace {
     val statFs = StatFs(Environment.getDataDirectory().path)
     val totalBytes = statFs.totalBytes.coerceAtLeast(1L)
@@ -262,6 +337,14 @@ private fun readDeviceDiskSpace(): DiskSpace {
     )
 }
 
+/**
+ * 将字节数格式化为可读的存储大小字符串
+ *
+ * 优先以 GB 为单位显示，不足 1 GB 时以 MB 为单位显示。
+ *
+ * @param bytes 字节数
+ * @return 格式化后的字符串，如 "25.30 GB" 或 "512.00 MB"
+ */
 private fun formatStorageSize(bytes: Long): String {
     val gb = bytes / 1024f / 1024f / 1024f
     if (gb >= 1f) {

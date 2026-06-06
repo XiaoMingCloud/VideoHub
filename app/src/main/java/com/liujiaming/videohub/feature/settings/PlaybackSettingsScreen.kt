@@ -43,10 +43,31 @@ import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+// ========================================================================
+// 播放设置主页面
+// ========================================================================
+
+/**
+ * 播放设置页面
+ *
+ * 包含以下设置项：
+ * - **快进/快退间隔**：通过弹窗选择预设时间间隔
+ * - **打开网盘视频时**：选择视频打开方式
+ * - **继续播放模式**：选择续播行为
+ * - **连续播放 / 记住播放进度 / 硬件加速**：开关设置
+ * - **默认播放速度 / 字幕偏移**：值显示
+ * - **后台继续播放**：开关设置
+ * - **自动消除隔行扫描**：开关设置（含说明文字）
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
+    // 快进/快退间隔选择弹窗的目标类型
     val intervalDialogTarget = remember { mutableStateOf<SeekIntervalTarget?>(null) }
+    // 网盘视频打开方式弹窗
     val showCloudVideoOpenModeDialog = remember { mutableStateOf(false) }
+    // 续播模式弹窗
     val showResumePlaybackModeDialog = remember { mutableStateOf(false) }
 
     Scaffold(
@@ -67,6 +88,7 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // === 基本播放设置卡片 ===
                 PlaybackCard {
                     SettingValueItem(
                         title = "快进间隔",
@@ -123,12 +145,14 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // === 高级播放设置卡片（隔行扫描消除） ===
                 PlaybackCard {
                     SettingSwitchItem(
                         title = "自动消除隔行扫描",
                         checked = SettingsMemory.autoDeinterlace,
                         onCheckedChange = SettingsMemory::updateAutoDeinterlace
                     )
+                    // 功能说明文字
                     Text(
                         text = "删除交错视频中的隔行扫描线。可能会影响非交错视频的播放。请谨慎打开。",
                         color = TextGray,
@@ -145,6 +169,7 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
         }
     }
 
+    // 快进/快退间隔选择弹窗
     intervalDialogTarget.value?.let { target ->
         PlaybackOptionDialog(
             title = target.title,
@@ -164,6 +189,7 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
         )
     }
 
+    // 网盘视频打开方式选择弹窗
     if (showCloudVideoOpenModeDialog.value) {
         PlaybackOptionDialog(
             title = "打开网盘视频时",
@@ -177,6 +203,7 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
         )
     }
 
+    // 续播模式选择弹窗
     if (showResumePlaybackModeDialog.value) {
         PlaybackOptionDialog(
             title = "继续播放",
@@ -191,6 +218,17 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
     }
 }
 
+// ========================================================================
+// 辅助组件
+// ========================================================================
+
+/**
+ * 播放设置页面顶部导航栏
+ *
+ * 居中显示"播放"标题，左侧放置返回按钮。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun PlaybackTopBar(onBackClick: () -> Unit) {
     Box(
@@ -220,6 +258,13 @@ private fun PlaybackTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 播放设置卡片容器
+ *
+ * 圆角卡片样式，用于包裹播放设置项列表。
+ *
+ * @param content 卡片内容组合
+ */
 @Composable
 private fun PlaybackCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -234,6 +279,7 @@ private fun PlaybackCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/** 播放设置项之间的分隔线 */
 @Composable
 private fun ItemDivider() {
     Divider(
@@ -243,6 +289,15 @@ private fun ItemDivider() {
     )
 }
 
+/**
+ * 值显示型播放设置项
+ *
+ * 左侧显示标题，右侧以绿色文本显示当前值，点击可触发选择弹窗。
+ *
+ * @param title 设置项标题
+ * @param value 当前设置值文本
+ * @param onClick 点击回调（默认空操作）
+ */
 @Composable
 private fun SettingValueItem(
     title: String,
@@ -273,6 +328,17 @@ private fun SettingValueItem(
     }
 }
 
+/**
+ * 播放选项选择弹窗
+ *
+ * 以列表形式展示播放相关选项，当前选中项以绿色高亮显示。
+ *
+ * @param title 弹窗标题
+ * @param options 可选项列表
+ * @param selectedOption 当前选中的选项
+ * @param onOptionSelected 选择选项后的回调
+ * @param onDismiss 关闭弹窗回调
+ */
 @Composable
 private fun PlaybackOptionDialog(
     title: String,
@@ -299,6 +365,7 @@ private fun PlaybackOptionDialog(
                     .heightIn(max = 420.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // 遍历所有选项
                 options.forEach { option ->
                     Text(
                         text = option,
@@ -318,6 +385,15 @@ private fun PlaybackOptionDialog(
     )
 }
 
+/**
+ * 开关型播放设置项
+ *
+ * 左侧显示标题文本，右侧显示 Switch 开关。
+ *
+ * @param title 设置项标题
+ * @param checked 当前开关状态
+ * @param onCheckedChange 开关状态变更回调
+ */
 @Composable
 private fun SettingSwitchItem(
     title: String,
@@ -352,7 +428,16 @@ private fun SettingSwitchItem(
     }
 }
 
+/**
+ * 快进/快退间隔目标枚举
+ *
+ * 用于标识当前弹窗是在设置快进间隔还是快退间隔。
+ *
+ * @property title 弹窗标题文本
+ */
 private enum class SeekIntervalTarget(val title: String) {
+    /** 快进间隔 */
     FastForward("快进间隔"),
+    /** 快退间隔 */
     Rewind("快退间隔")
 }

@@ -42,6 +42,17 @@ import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+/**
+ * 文件源主页面。
+ * 当前展示空状态界面，提示用户添加文件源。
+ * 包含顶部标题栏（带使用教程入口）和底部悬浮导航栏。
+ *
+ * @param onAddFileSourceClick 点击"添加文件源"按钮的回调
+ * @param onTutorialClick 点击"使用教程"的回调
+ * @param onMediaClick 底部导航"媒体库"点击回调
+ * @param onServerClick 底部导航"影视服务器"点击回调
+ * @param onSettingsClick 底部导航"设置"点击回调
+ */
 @Composable
 fun FileSourceScreen(
     onAddFileSourceClick: () -> Unit,
@@ -53,10 +64,11 @@ fun FileSourceScreen(
     Scaffold(
         containerColor = PageBackground,
         bottomBar = {
+            // 底部悬浮导航栏，当前高亮"文件源"项
             FloatingBottomNav(
                 activeItem = BottomNavItem.File,
                 onMediaClick = onMediaClick,
-                onFileClick = {},
+                onFileClick = {},       // 当前已在文件源页面，无需跳转
                 onServerClick = onServerClick,
                 onSettingsClick = onSettingsClick
             )
@@ -67,6 +79,7 @@ fun FileSourceScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // 顶部标题栏，包含"使用教程"和"更多"按钮
             FileSourceTopBar(
                 onTutorialClick = onTutorialClick,
                 modifier = Modifier
@@ -74,6 +87,7 @@ fun FileSourceScreen(
                     .statusBarsPadding()
             )
 
+            // 空状态内容：Logo + 提示文字 + 添加按钮
             EmptyFileSourceContent(
                 onAddClick = onAddFileSourceClick,
                 modifier = Modifier.align(Alignment.Center)
@@ -82,6 +96,13 @@ fun FileSourceScreen(
     }
 }
 
+/**
+ * 文件源页面顶部栏。
+ * 左侧显示"文件源"大标题，右侧显示"使用教程"文本按钮和"更多"图标按钮。
+ *
+ * @param onTutorialClick 点击"使用教程"的回调
+ * @param modifier 布局修饰符
+ */
 @Composable
 private fun FileSourceTopBar(
     onTutorialClick: () -> Unit,
@@ -94,6 +115,7 @@ private fun FileSourceTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // 页面大标题
         Text(
             text = "文件源",
             color = PrimaryText,
@@ -102,6 +124,7 @@ private fun FileSourceTopBar(
             letterSpacing = 0.sp
         )
 
+        // 右侧操作区：使用教程 + 更多菜单
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onTutorialClick) {
                 Text(
@@ -123,6 +146,13 @@ private fun FileSourceTopBar(
     }
 }
 
+/**
+ * 文件源为空时的占位内容。
+ * 居中展示应用 Logo、提示文字和"添加文件源"按钮。
+ *
+ * @param onAddClick 点击添加按钮的回调
+ * @param modifier 布局修饰符
+ */
 @Composable
 private fun EmptyFileSourceContent(
     onAddClick: () -> Unit,
@@ -132,9 +162,10 @@ private fun EmptyFileSourceContent(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 72.dp),
+            .padding(bottom = 72.dp),    // 预留底部导航栏空间
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // 应用 Logo 图片，圆角 24dp 裁剪
         Image(
             painter = painterResource(id = R.drawable.logo),
             contentDescription = "VideoHub",
@@ -146,6 +177,7 @@ private fun EmptyFileSourceContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // 主提示文字
         Text(
             text = "文件源为空",
             color = PrimaryText,
@@ -156,6 +188,7 @@ private fun EmptyFileSourceContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // 副提示文字
         Text(
             text = "请添加文件源，享受您的私人影院。",
             color = TextGray,
@@ -165,6 +198,7 @@ private fun EmptyFileSourceContent(
 
         Spacer(modifier = Modifier.height(48.dp))
 
+        // 添加文件源按钮，绿色背景，圆角胶囊形状
         Button(
             onClick = onAddClick,
             modifier = Modifier

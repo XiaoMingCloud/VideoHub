@@ -1,8 +1,15 @@
 package com.liujiaming.videohub.feature.settings
 
+/**
+ * 语言选项定义。
+ * 包含自动检测（跟随系统语言）和常见语言列表，
+ * 用于设置页面中的语言选择器。
+ */
 object LanguageOptions {
+    /** 自动检测选项，跟随系统当前语言 */
     const val AUTO_SYSTEM_LANGUAGE = "自动（系统当前语言）"
 
+    /** 常见语言列表，按使用频率排序 */
     val commonLanguages = listOf(
         "简体中文",
         "繁体中文",
@@ -43,5 +50,6 @@ object LanguageOptions {
         "威尔士语"
     )
 
+    /** 包含自动检测和常见语言的完整列表 */
     val autoAndCommonLanguages = listOf(AUTO_SYSTEM_LANGUAGE) + commonLanguages
 }

@@ -47,6 +47,25 @@ import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.SettingsIconGreen
 
+/**
+ * 设置主页面。
+ * 以分组卡片形式展示所有设置入口：
+ * - 第一组：通用、资源、下载、同步
+ * - 第二组：播放、播放器界面、字幕和音轨
+ * - 第三组：使用教程、分享给朋友、检查更新、关于
+ * 底部显示悬浮导航栏，当前高亮“设置”项。
+ *
+ * @param onGeneralClick 通用设置点击回调
+ * @param onResourceClick 资源设置点击回调
+ * @param onDownloadClick 下载设置点击回调
+ * @param onPlaybackClick 播放设置点击回调
+ * @param onPlayerInterfaceClick 播放器界面设置点击回调
+ * @param onSubtitleTrackClick 字幕和音轨设置点击回调
+ * @param onAboutClick 关于页面点击回调
+ * @param onMediaClick 底部导航“媒体库”点击回调
+ * @param onFileClick 底部导航“文件源”点击回调
+ * @param onServerClick 底部导航“影视服务器”点击回调
+ */
 @Composable
 fun SettingsScreen(
     onGeneralClick: () -> Unit,
@@ -88,6 +107,7 @@ fun SettingsScreen(
                 modifier = Modifier.padding(start = 24.dp, top = 18.dp, bottom = 16.dp)
             )
 
+            // 第一组：基础设置
             SettingsCard {
                 SettingsItem("通用", Icons.Default.Settings, onGeneralClick)
                 AppListDivider()
@@ -98,6 +118,7 @@ fun SettingsScreen(
                 SettingsItem("同步", Icons.Default.Sync)
             }
 
+            // 第二组：播放相关设置
             SettingsCard {
                 SettingsItem("播放", Icons.Default.PlayCircle, onPlaybackClick)
                 AppListDivider()
@@ -106,6 +127,7 @@ fun SettingsScreen(
                 SettingsItem("字幕和音轨", Icons.Default.Subtitles, onSubtitleTrackClick)
             }
 
+            // 第三组：其他
             SettingsCard {
                 SettingsItem("使用教程", Icons.Default.Info)
                 AppListDivider()
@@ -121,6 +143,10 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * 设置卡片容器组件，圆角 18dp，无阴影。
+ * 用于将相关设置项分组展示。
+ */
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -135,6 +161,14 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/**
+ * 设置项行组件。
+ * 由绿色图标、标题文字和右侧箭头组成，点击可跳转到对应设置页面。
+ *
+ * @param title 设置项名称
+ * @param icon 设置项图标
+ * @param onClick 点击回调
+ */
 @Composable
 private fun SettingsItem(
     title: String,

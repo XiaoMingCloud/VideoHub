@@ -36,6 +36,13 @@ import com.liujiaming.videohub.ui.theme.BackgroundGray
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+/**
+ * 关于页面 - 展示应用基本信息
+ *
+ * 包含：Logo、应用名称、版本号、第三方许可链接、TMDB 声明及版权信息。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 fun AboutScreen(onBackClick: () -> Unit) {
     Scaffold(
@@ -49,10 +56,12 @@ fun AboutScreen(onBackClick: () -> Unit) {
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // 顶部导航栏
             AboutTopBar(onBackClick)
 
             Spacer(modifier = Modifier.height(36.dp))
 
+            // 应用 Logo 图片（带圆角阴影）
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "VideoHub",
@@ -65,6 +74,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // 应用名称
             Text(
                 text = "VideoHub",
                 color = PrimaryText,
@@ -75,6 +85,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // 版本号
             Text(
                 text = "1.3.2",
                 color = TextGray,
@@ -84,12 +95,15 @@ fun AboutScreen(onBackClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // 第三方许可信息链接
             AboutLink("第三方许可信息")
             Spacer(modifier = Modifier.height(16.dp))
+            // 开源项目信息链接
             AboutLink("开源项目信息")
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            // TMDB API 使用声明
             Text(
                 text = "This product uses the TMDB API but is not endorsed or certified by TMDB.",
                 color = TextGray,
@@ -102,16 +116,19 @@ fun AboutScreen(onBackClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // TMDB 品牌标识
             Text(
                 text = "TMDB",
-                color = Color(0xFF01B4E4),
+                color = Color(0xFF01B4E4), // TMDB 品牌蓝色
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.sp
             )
 
+            // 弹性空间，将版权信息推到底部
             Spacer(modifier = Modifier.weight(1f))
 
+            // 版权信息
             Text(
                 text = "© 2026 XiaoMingCloud 版权所有",
                 color = TextGray,
@@ -125,6 +142,13 @@ fun AboutScreen(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 关于页面顶部导航栏
+ *
+ * 居中显示"关于"标题，左侧放置返回按钮。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun AboutTopBar(onBackClick: () -> Unit) {
     Box(
@@ -154,6 +178,13 @@ private fun AboutTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 关于页面的可点击链接文本组件
+ *
+ * 以绿色（ActiveGreen）显示可点击的文字链接。
+ *
+ * @param text 链接文本内容
+ */
 @Composable
 private fun AboutLink(text: String) {
     Text(

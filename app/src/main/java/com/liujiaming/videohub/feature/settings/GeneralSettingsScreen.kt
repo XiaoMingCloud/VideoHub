@@ -50,12 +50,34 @@ import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+// === 颜色常量 ===
+
+/** 步进器按钮背景色 */
 private val StepperBackground = Color(0xFFE5E5EA)
+
+/** 步进器中间分隔线颜色 */
 private val StepperDivider = Color(0xFFC7C7CC)
 
+// ========================================================================
+// 通用设置主页面
+// ========================================================================
+
+/**
+ * 通用设置页面
+ *
+ * 包含以下设置分组：
+ * - **通用**：隐藏剧透、触感反馈、媒体/文件排序方式、外观、在线影视数据语言
+ * - **下载**：蜂窝网络开关、切换提醒、并发数、悬浮窗、播放时暂停
+ *
+ * 通过弹窗选择外观模式和在线影视数据语言。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 fun GeneralSettingsScreen(onBackClick: () -> Unit) {
+    // 外观选择弹窗显示状态
     val showAppearanceDialog = remember { mutableStateOf(false) }
+    // 在线影视数据语言选择弹窗显示状态
     val showOnlineMetadataLanguageDialog = remember { mutableStateOf(false) }
 
     Scaffold(
@@ -67,6 +89,7 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
                 .padding(paddingValues)
                 .statusBarsPadding()
         ) {
+            // 顶部导航栏
             GeneralTopBar(onBackClick)
 
             Column(
@@ -76,6 +99,7 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // === 通用设置分组 ===
                 GeneralSettingsCard {
                     SettingsSwitchItem(
                         title = "隐藏剧透",
@@ -106,6 +130,7 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
                     )
                 }
 
+                // === 下载设置分组标题 ===
                 Text(
                     text = "下载",
                     color = TextGray,
@@ -114,6 +139,7 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
                     modifier = Modifier.padding(start = 32.dp, top = 24.dp, bottom = 8.dp)
                 )
 
+                // === 下载设置分组 ===
                 GeneralSettingsCard {
                     SettingsSwitchItem(
                         title = "允许使用蜂窝网络",
@@ -151,6 +177,7 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
         }
     }
 
+    // 外观选择弹窗
     if (showAppearanceDialog.value) {
         AppearanceSelectionDialog(
             selectedAppearance = SettingsMemory.appearance,
@@ -162,6 +189,7 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
         )
     }
 
+    // 在线影视数据语言选择弹窗
     if (showOnlineMetadataLanguageDialog.value) {
         LanguageSelectionDialog(
             title = "在线影视数据语言",
@@ -176,6 +204,17 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
     }
 }
 
+// ========================================================================
+// 辅助组件
+// ========================================================================
+
+/**
+ * 通用设置页面顶部导航栏
+ *
+ * 居中显示"通用"标题，左侧放置返回按钮。
+ *
+ * @param onBackClick 返回按钮点击回调
+ */
 @Composable
 private fun GeneralTopBar(onBackClick: () -> Unit) {
     Box(
@@ -205,6 +244,13 @@ private fun GeneralTopBar(onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * 通用设置卡片容器
+ *
+ * 圆角卡片样式，用于包裹设置项列表。
+ *
+ * @param content 卡片内容组合
+ */
 @Composable
 private fun GeneralSettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
@@ -219,6 +265,9 @@ private fun GeneralSettingsCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+/**
+ * 设置项之间的分隔线
+ */
 @Composable
 private fun ItemDivider() {
     Divider(
@@ -228,6 +277,15 @@ private fun ItemDivider() {
     )
 }
 
+/**
+ * 开关型设置项
+ *
+ * 左侧显示标题文本，右侧显示 Switch 开关。
+ *
+ * @param title 设置项标题
+ * @param checked 当前开关状态
+ * @param onCheckedChange 开关状态变更回调
+ */
 @Composable
 private fun SettingsSwitchItem(
     title: String,
@@ -262,6 +320,15 @@ private fun SettingsSwitchItem(
     }
 }
 
+/**
+ * 值显示型设置项
+ *
+ * 左侧显示标题，右侧以绿色文本显示当前值，点击可触发选择弹窗。
+ *
+ * @param title 设置项标题
+ * @param value 当前设置值文本
+ * @param onClick 点击回调（默认空操作）
+ */
 @Composable
 private fun SettingsValueItem(
     title: String,
@@ -297,6 +364,16 @@ private fun SettingsValueItem(
     }
 }
 
+/**
+ * 外观模式选择弹窗
+ *
+ * 以列表形式展示所有外观选项（如"跟随系统"、"浅色"、"深色"），
+ * 当前选中项以绿色高亮显示。
+ *
+ * @param selectedAppearance 当前选中的外观模式
+ * @param onAppearanceSelected 选择外观模式后的回调
+ * @param onDismiss 关闭弹窗回调
+ */
 @Composable
 private fun AppearanceSelectionDialog(
     selectedAppearance: String,
@@ -321,6 +398,7 @@ private fun AppearanceSelectionDialog(
                     .heightIn(max = 240.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // 遍历所有外观选项
                 AppearanceOptions.modes.forEach { appearance ->
                     Text(
                         text = appearance,
@@ -340,6 +418,18 @@ private fun AppearanceSelectionDialog(
     )
 }
 
+/**
+ * 语言选择弹窗
+ *
+ * 通用的语言列表选择弹窗，用于选择在线影视数据语言等。
+ * 当前选中语言以绿色高亮显示。
+ *
+ * @param title 弹窗标题
+ * @param options 可选语言列表
+ * @param selectedLanguage 当前选中的语言
+ * @param onLanguageSelected 选择语言后的回调
+ * @param onDismiss 关闭弹窗回调
+ */
 @Composable
 private fun LanguageSelectionDialog(
     title: String,
@@ -366,6 +456,7 @@ private fun LanguageSelectionDialog(
                     .heightIn(max = 420.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // 遍历所有语言选项
                 options.forEach { language ->
                     Text(
                         text = language,
@@ -385,6 +476,16 @@ private fun LanguageSelectionDialog(
     )
 }
 
+/**
+ * 步进器型设置项（用于数值调节）
+ *
+ * 左侧显示标题，右侧显示当前值和增减按钮。
+ * 最小值限制为 1。
+ *
+ * @param title 设置项标题
+ * @param value 当前数值
+ * @param onValueChange 数值变更回调
+ */
 @Composable
 private fun SettingsStepperItem(
     title: String,
@@ -406,6 +507,7 @@ private fun SettingsStepperItem(
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // 当前数值显示
             Text(
                 text = value.toString(),
                 color = TextGray,
@@ -414,6 +516,7 @@ private fun SettingsStepperItem(
                 modifier = Modifier.padding(end = 12.dp)
             )
 
+            // 步进器按钮组（减少 | 增加）
             Row(
                 modifier = Modifier
                     .height(28.25.dp)
@@ -421,6 +524,7 @@ private fun SettingsStepperItem(
                     .background(StepperBackground),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // 减少按钮（最小值为1）
                 IconButton(
                     onClick = { if (value > 1) onValueChange(value - 1) },
                     modifier = Modifier.width(40.dp)
@@ -433,6 +537,7 @@ private fun SettingsStepperItem(
                     )
                 }
 
+                // 中间分隔线
                 Box(
                     modifier = Modifier
                         .width(1.dp)
@@ -440,6 +545,7 @@ private fun SettingsStepperItem(
                         .background(StepperDivider)
                 )
 
+                // 增加按钮
                 IconButton(
                     onClick = { onValueChange(value + 1) },
                     modifier = Modifier.width(40.dp)

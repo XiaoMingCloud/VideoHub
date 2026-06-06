@@ -75,7 +75,7 @@ fun FileSourceTutorialScreen(onBackClick: () -> Unit) {
                     )
                     TutorialParagraph(
                         title = "重命名",
-                        body = "VidHub 内的改名操作将同步至原始存储，媒体库将基于新文件名自动重新刮削。"
+                        body = "VideoHub 内的改名操作将同步至原始存储，媒体库将基于新文件名自动重新刮削。"
                     )
                     TutorialParagraph(
                         title = "下载与删除",
@@ -141,7 +141,7 @@ private fun TutorialCard(
         colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(17.75.dp)) {
             Text(
                 text = title,
                 color = PrimaryText,

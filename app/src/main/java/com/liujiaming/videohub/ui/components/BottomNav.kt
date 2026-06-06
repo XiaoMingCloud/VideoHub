@@ -54,7 +54,7 @@ fun FloatingBottomNav(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.9.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -68,7 +68,7 @@ fun FloatingBottomNav(
                 )
                 .clip(CircleShape)
                 .background(CardBackground)
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(horizontal = 8.dp, vertical = 8.9.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -94,7 +94,7 @@ private fun NavItem(
             .width(72.dp)
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(vertical = 3.6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
@@ -103,7 +103,7 @@ private fun NavItem(
             tint = color,
             modifier = Modifier.size(24.dp)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(3.6.dp))
         Text(
             text = title,
             color = color,

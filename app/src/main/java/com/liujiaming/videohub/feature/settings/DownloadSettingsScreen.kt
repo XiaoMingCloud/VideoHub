@@ -110,7 +110,7 @@ private fun DownloadTopBar(onBackClick: () -> Unit) {
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .clickable { }
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 10.5.dp)
         )
     }
 }
@@ -126,7 +126,7 @@ private fun DownloadTabs(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp)
+                .height(42.25.dp)
         ) {
             tabs.forEachIndexed { index, title ->
                 Column(
@@ -200,7 +200,7 @@ private fun DiskSpaceIndicator() {
         modifier = Modifier
             .fillMaxWidth()
             .background(PageBackground)
-            .padding(horizontal = 20.dp, vertical = 18.dp)
+            .padding(horizontal = 20.dp, vertical = 15.85.dp)
     ) {
         Box(
             modifier = Modifier
@@ -220,7 +220,7 @@ private fun DiskSpaceIndicator() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp),
+                .padding(top = 8.9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(

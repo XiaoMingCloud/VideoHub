@@ -253,7 +253,7 @@ private fun SettingValueItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 15.85.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -309,7 +309,7 @@ private fun PlaybackOptionDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onOptionSelected(option) }
-                            .padding(vertical = 12.dp)
+                            .padding(vertical = 10.5.dp)
                     )
                 }
             }
@@ -327,7 +327,7 @@ private fun SettingSwitchItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

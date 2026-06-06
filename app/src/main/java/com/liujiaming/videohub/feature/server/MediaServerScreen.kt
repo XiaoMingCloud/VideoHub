@@ -1,6 +1,8 @@
 package com.liujiaming.videohub.feature.server
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
@@ -27,14 +30,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.liujiaming.videohub.feature.emby.EmbyAuthSession
+import com.liujiaming.videohub.feature.emby.EmbySessionStore
 import com.liujiaming.videohub.ui.components.AppListDivider
 import com.liujiaming.videohub.ui.components.BottomNavItem
 import com.liujiaming.videohub.ui.components.FloatingBottomNav
@@ -53,6 +61,9 @@ fun MediaServerScreen(
     onFileClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val embySession = remember { EmbySessionStore.load(context) }
+
     Scaffold(
         containerColor = BackgroundGray,
         bottomBar = {
@@ -75,6 +86,19 @@ fun MediaServerScreen(
             Spacer(modifier = Modifier.height(18.dp))
             TopHeader()
             Spacer(modifier = Modifier.height(24.dp))
+
+            if (embySession != null) {
+                Text(
+                    text = "已连接",
+                    color = TextGray,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+
+                ConnectedEmbyCard(embySession)
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Text(
                 text = "连接到...",
@@ -100,6 +124,65 @@ fun MediaServerScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConnectedEmbyCard(session: EmbyAuthSession) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.75.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            EmbyAvatar(session)
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = session.serverName.ifBlank { "Emby 媒体库" },
+                    color = PrimaryText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.sp
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "Emby · ${session.username}",
+                    color = TextGray,
+                    fontSize = 13.sp,
+                    letterSpacing = 0.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmbyAvatar(session: EmbyAuthSession) {
+    Box(
+        modifier = Modifier
+            .size(41.5.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF43A047)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = session.username.firstOrNull()?.uppercase() ?: "E",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.sp
+        )
     }
 }
 
@@ -139,7 +222,7 @@ private fun ServerListItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 14.15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

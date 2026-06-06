@@ -13,79 +13,112 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material3.Divider
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.liujiaming.videohub.ui.components.AppListDivider
+import com.liujiaming.videohub.ui.theme.ActiveGreen
+import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
-private val SectionHeaderBackground = Color(0xFFF5F5F5)
-private val FileSourceDivider = Color(0xFFEEEEEE)
-private val StorageIconBlue = Color(0xFF1976D2)
-private val AddIconGreen = Color(0xFF2E7D32)
+private val StorageBlue = Color(0xFF1976D2)
+private val StoragePurple = Color(0xFF7B61FF)
+private val StorageOrange = Color(0xFFFF8A00)
+
+private val storageSections = listOf(
+    StorageSection(
+        title = "本地存储",
+        options = listOf(
+            StorageOption("本地目录", Icons.Default.Folder, StorageBlue)
+        )
+    ),
+    StorageSection(
+        title = "网络存储",
+        options = listOf(
+            StorageOption("SMB", Icons.Default.Storage, StoragePurple),
+            StorageOption("WebDAV / Alist", Icons.Default.Cloud, ActiveGreen)
+        )
+    ),
+    StorageSection(
+        title = "云盘存储",
+        options = listOf(
+            StorageOption("阿里云盘", Icons.Default.CloudDownload, StorageOrange),
+            StorageOption("百度网盘", Icons.Default.CloudDownload, StorageBlue),
+            StorageOption("夸克网盘", Icons.Default.CloudDownload, ActiveGreen),
+            StorageOption("123云盘", Icons.Default.CloudDownload, StoragePurple),
+            StorageOption("天翼云盘", Icons.Default.CloudDownload, StorageOrange),
+            StorageOption("迅雷云盘", Icons.Default.CloudDownload, StorageBlue),
+            StorageOption("OneDrive", Icons.Default.CloudDownload, StorageBlue),
+            StorageOption("Google Drive", Icons.Default.CloudDownload, ActiveGreen),
+            StorageOption("Dropbox", Icons.Default.CloudDownload, StoragePurple),
+            StorageOption("Premiumize", Icons.Default.CloudDownload, StorageOrange)
+        )
+    )
+)
 
 @Composable
 fun ManageFileSourceScreen(onBackClick: () -> Unit) {
-    Scaffold(
-        containerColor = PageBackground
-    ) { paddingValues ->
+    Scaffold(containerColor = PageBackground) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .statusBarsPadding()
         ) {
-            ManageFileSourceTopBar(onBackClick)
+            AddStorageTopBar(onBackClick)
 
-            Box(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SectionHeaderBackground)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .fillMaxSize()
+                    .background(BackgroundGray)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                Text(
-                    text = "已添加的存储",
-                    color = TextGray,
-                    fontSize = 14.sp,
-                    letterSpacing = 0.sp
-                )
+                storageSections.forEachIndexed { index, section ->
+                    if (index > 0) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                    StorageSectionCard(section)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
-
-            StorageListItem("我的 WebDAV", Icons.Default.Folder, StorageIconBlue)
-            FullWidthDivider()
-            StorageListItem("我的中国移动云盘（不限速）", Icons.Default.CloudQueue, StorageIconBlue)
-            FullWidthDivider()
-            StorageListItem("我的 WebDAV", Icons.Default.Folder, StorageIconBlue)
-            FullWidthDivider()
-            AddStorageItem()
-            FullWidthDivider()
         }
     }
 }
 
 @Composable
-private fun ManageFileSourceTopBar(onBackClick: () -> Unit) {
+private fun AddStorageTopBar(onBackClick: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp),
+            .height(56.dp)
+            .background(PageBackground),
         contentAlignment = Alignment.Center
     ) {
         IconButton(
@@ -100,7 +133,7 @@ private fun ManageFileSourceTopBar(onBackClick: () -> Unit) {
         }
 
         Text(
-            text = "添加/修改文件源",
+            text = "添加存储",
             color = PrimaryText,
             fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
@@ -110,80 +143,85 @@ private fun ManageFileSourceTopBar(onBackClick: () -> Unit) {
 }
 
 @Composable
-private fun StorageListItem(
-    title: String,
-    icon: ImageVector,
-    iconTint: Color
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { }
-            .padding(horizontal = 16.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(24.dp)
-        )
-
-        Spacer(modifier = Modifier.width(16.dp))
-
+private fun StorageSectionCard(section: StorageSection) {
+    Column {
         Text(
-            text = title,
-            color = PrimaryText,
-            fontSize = 16.sp,
-            modifier = Modifier.weight(1f),
-            letterSpacing = 0.sp
+            text = section.title,
+            color = TextGray,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
 
-        IconButton(
-            onClick = { },
-            modifier = Modifier.size(32.dp)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardBackground),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.MoreHoriz,
-                contentDescription = "更多",
-                tint = TextGray
-            )
+            section.options.forEachIndexed { index, option ->
+                StorageOptionRow(option)
+                if (index != section.options.lastIndex) {
+                    AppListDivider()
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun AddStorageItem() {
+private fun StorageOptionRow(option: StorageOption) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { }
-            .padding(horizontal = 16.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = "添加",
-            tint = AddIconGreen,
-            modifier = Modifier.size(24.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(option.tint.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = option.icon,
+                contentDescription = null,
+                tint = option.tint,
+                modifier = Modifier.size(21.dp)
+            )
+        }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Text(
-            text = "添加存储",
+            text = option.title,
             color = PrimaryText,
             fontSize = 16.sp,
             modifier = Modifier.weight(1f),
             letterSpacing = 0.sp
         )
+
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextGray,
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
 
-@Composable
-private fun FullWidthDivider() {
-    Divider(
-        color = FileSourceDivider,
-        thickness = 1.dp
-    )
-}
+@Immutable
+private data class StorageSection(
+    val title: String,
+    val options: List<StorageOption>
+)
+
+@Immutable
+private data class StorageOption(
+    val title: String,
+    val icon: ImageVector,
+    val tint: Color
+)

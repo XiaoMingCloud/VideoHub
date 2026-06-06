@@ -1,10 +1,15 @@
 package com.liujiaming.videohub.navigation
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.platform.LocalContext
 import com.liujiaming.videohub.feature.emby.AddEmbyScreen
 import com.liujiaming.videohub.feature.filesource.FileSourceScreen
 import com.liujiaming.videohub.feature.filesource.FileSourceTutorialScreen
@@ -24,93 +29,128 @@ import com.liujiaming.videohub.feature.settings.SettingsScreen
 
 @Composable
 fun VideoHubApp() {
-    var currentScreen by remember { mutableStateOf(VideoHubScreen.MediaLibrary) }
+    val context = LocalContext.current
+    val backStack = remember { mutableListOf(VideoHubScreen.MediaLibrary).toMutableStateList() }
+    val currentScreen = backStack.last()
+    var lastExitPressTime by remember { mutableStateOf(0L) }
+
+    fun navigateTo(screen: VideoHubScreen) {
+        if (currentScreen == screen) return
+        backStack.add(screen)
+    }
+
+    fun switchRoot(screen: VideoHubScreen) {
+        if (currentScreen == screen) return
+        backStack.clear()
+        backStack.add(screen)
+    }
+
+    fun goBack() {
+        if (backStack.size > 1) {
+            backStack.removeAt(backStack.lastIndex)
+        }
+    }
+
+    BackHandler {
+        if (backStack.size > 1) {
+            goBack()
+            return@BackHandler
+        }
+
+        val now = System.currentTimeMillis()
+        if (now - lastExitPressTime <= EXIT_CONFIRM_INTERVAL_MS) {
+            (context as? Activity)?.finish()
+        } else {
+            lastExitPressTime = now
+            Toast.makeText(context, "再按一次退出app", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     when (currentScreen) {
         VideoHubScreen.MediaLibrary -> MediaLibraryScreen(
-            onAddFileSourceClick = { currentScreen = VideoHubScreen.FileSource },
-            onAddServerClick = { currentScreen = VideoHubScreen.ServerList },
-            onFileClick = { currentScreen = VideoHubScreen.FileSource },
-            onServerClick = { currentScreen = VideoHubScreen.ServerList },
-            onSettingsClick = { currentScreen = VideoHubScreen.Settings }
+            onAddFileSourceClick = { navigateTo(VideoHubScreen.FileSource) },
+            onAddServerClick = { navigateTo(VideoHubScreen.ServerList) },
+            onFileClick = { switchRoot(VideoHubScreen.FileSource) },
+            onServerClick = { switchRoot(VideoHubScreen.ServerList) },
+            onSettingsClick = { switchRoot(VideoHubScreen.Settings) }
         )
 
         VideoHubScreen.ServerList -> MediaServerScreen(
-            onEmbyClick = { currentScreen = VideoHubScreen.AddEmby },
-            onJellyfinClick = { currentScreen = VideoHubScreen.AddJellyfin },
-            onFnosClick = { currentScreen = VideoHubScreen.AddFnos },
-            onMediaClick = { currentScreen = VideoHubScreen.MediaLibrary },
-            onFileClick = { currentScreen = VideoHubScreen.FileSource },
-            onSettingsClick = { currentScreen = VideoHubScreen.Settings }
+            onEmbyClick = { navigateTo(VideoHubScreen.AddEmby) },
+            onJellyfinClick = { navigateTo(VideoHubScreen.AddJellyfin) },
+            onFnosClick = { navigateTo(VideoHubScreen.AddFnos) },
+            onMediaClick = { switchRoot(VideoHubScreen.MediaLibrary) },
+            onFileClick = { switchRoot(VideoHubScreen.FileSource) },
+            onSettingsClick = { switchRoot(VideoHubScreen.Settings) }
         )
 
         VideoHubScreen.AddEmby -> AddEmbyScreen(
-            onBackClick = { currentScreen = VideoHubScreen.ServerList }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.AddJellyfin -> AddJellyfinScreen(
-            onBackClick = { currentScreen = VideoHubScreen.ServerList }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.AddFnos -> AddFnosScreen(
-            onBackClick = { currentScreen = VideoHubScreen.ServerList }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.FileSource -> FileSourceScreen(
-            onAddFileSourceClick = { currentScreen = VideoHubScreen.ManageFileSource },
-            onTutorialClick = { currentScreen = VideoHubScreen.FileSourceTutorial },
-            onMediaClick = { currentScreen = VideoHubScreen.MediaLibrary },
-            onServerClick = { currentScreen = VideoHubScreen.ServerList },
-            onSettingsClick = { currentScreen = VideoHubScreen.Settings }
+            onAddFileSourceClick = { navigateTo(VideoHubScreen.ManageFileSource) },
+            onTutorialClick = { navigateTo(VideoHubScreen.FileSourceTutorial) },
+            onMediaClick = { switchRoot(VideoHubScreen.MediaLibrary) },
+            onServerClick = { switchRoot(VideoHubScreen.ServerList) },
+            onSettingsClick = { switchRoot(VideoHubScreen.Settings) }
         )
 
         VideoHubScreen.FileSourceTutorial -> FileSourceTutorialScreen(
-            onBackClick = { currentScreen = VideoHubScreen.FileSource }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.ManageFileSource -> ManageFileSourceScreen(
-            onBackClick = { currentScreen = VideoHubScreen.FileSource }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.Settings -> SettingsScreen(
-            onGeneralClick = { currentScreen = VideoHubScreen.GeneralSettings },
-            onResourceClick = { currentScreen = VideoHubScreen.ResourceSettings },
-            onDownloadClick = { currentScreen = VideoHubScreen.DownloadSettings },
-            onPlaybackClick = { currentScreen = VideoHubScreen.PlaybackSettings },
-            onPlayerInterfaceClick = { currentScreen = VideoHubScreen.PlayerInterfaceSettings },
-            onSubtitleTrackClick = { currentScreen = VideoHubScreen.SubtitleTrackSettings },
-            onAboutClick = { currentScreen = VideoHubScreen.About },
-            onMediaClick = { currentScreen = VideoHubScreen.MediaLibrary },
-            onFileClick = { currentScreen = VideoHubScreen.FileSource },
-            onServerClick = { currentScreen = VideoHubScreen.ServerList }
+            onGeneralClick = { navigateTo(VideoHubScreen.GeneralSettings) },
+            onResourceClick = { navigateTo(VideoHubScreen.ResourceSettings) },
+            onDownloadClick = { navigateTo(VideoHubScreen.DownloadSettings) },
+            onPlaybackClick = { navigateTo(VideoHubScreen.PlaybackSettings) },
+            onPlayerInterfaceClick = { navigateTo(VideoHubScreen.PlayerInterfaceSettings) },
+            onSubtitleTrackClick = { navigateTo(VideoHubScreen.SubtitleTrackSettings) },
+            onAboutClick = { navigateTo(VideoHubScreen.About) },
+            onMediaClick = { switchRoot(VideoHubScreen.MediaLibrary) },
+            onFileClick = { switchRoot(VideoHubScreen.FileSource) },
+            onServerClick = { switchRoot(VideoHubScreen.ServerList) }
         )
 
         VideoHubScreen.GeneralSettings -> GeneralSettingsScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.ResourceSettings -> ResourceSettingsScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.DownloadSettings -> DownloadSettingsScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.PlaybackSettings -> PlaybackSettingsScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.PlayerInterfaceSettings -> PlayerInterfaceSettingsScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.SubtitleTrackSettings -> SubtitleTrackSettingsScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
 
         VideoHubScreen.About -> AboutScreen(
-            onBackClick = { currentScreen = VideoHubScreen.Settings }
+            onBackClick = ::goBack
         )
     }
 }
@@ -133,3 +173,5 @@ private enum class VideoHubScreen {
     SubtitleTrackSettings,
     About
 }
+
+private const val EXIT_CONFIRM_INTERVAL_MS = 2000L

@@ -55,7 +55,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
 
             Image(
                 painter = painterResource(id = R.drawable.logo),
-                contentDescription = "VidHub",
+                contentDescription = "VideoHub",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(120.dp)
@@ -66,7 +66,7 @@ fun AboutScreen(onBackClick: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "VidHub",
+                text = "VideoHub",
                 color = PrimaryText,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,

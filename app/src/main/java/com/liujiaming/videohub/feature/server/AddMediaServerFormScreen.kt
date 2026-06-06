@@ -47,12 +47,40 @@ import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
+data class MediaServerFormState(
+    val name: String,
+    val protocol: String,
+    val address: String,
+    val port: String,
+    val username: String,
+    val password: String
+)
+
 @Composable
 fun AddMediaServerFormScreen(
     serverName: String,
     defaultPort: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onSubmit: ((MediaServerFormState) -> Unit)? = null,
+    submitEnabled: (MediaServerFormState) -> Boolean = { false },
+    isSubmitting: Boolean = false,
+    submitText: String = "添加"
 ) {
+    var name by remember { mutableStateOf("") }
+    var protocol by remember { mutableStateOf("HTTP") }
+    var address by remember { mutableStateOf("") }
+    var port by remember { mutableStateOf(defaultPort) }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    val formState = MediaServerFormState(
+        name = name,
+        protocol = protocol,
+        address = address,
+        port = port,
+        username = username,
+        password = password
+    )
+
     Scaffold(
         containerColor = PageBackground
     ) { paddingValues ->
@@ -69,31 +97,33 @@ fun AddMediaServerFormScreen(
             )
             Spacer(modifier = Modifier.height(20.dp))
 
-            FormInputField(label = "名称", hint = "选填(自动获取)")
-            FormInputField(label = "协议", initialValue = "HTTP")
-            FormInputField(label = "服务器地址", hint = "127.0.0.1/sample.com")
-            FormInputField(label = "端口号", initialValue = defaultPort)
-            FormInputField(label = "用户名", hint = "必填")
-            FormInputField(label = "密码", hint = "选填", isPassword = true)
+            FormInputField(label = "名称", value = name, onValueChange = { name = it }, hint = "选填(自动获取)")
+            FormInputField(label = "协议", value = protocol, onValueChange = { protocol = it })
+            FormInputField(label = "服务器地址", value = address, onValueChange = { address = it }, hint = "127.0.0.1/sample.com")
+            FormInputField(label = "端口号", value = port, onValueChange = { port = it })
+            FormInputField(label = "用户名", value = username, onValueChange = { username = it }, hint = "必填")
+            FormInputField(label = "密码", value = password, onValueChange = { password = it }, hint = "选填", isPassword = true)
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { },
-                enabled = false,
+                onClick = { onSubmit?.invoke(formState) },
+                enabled = !isSubmitting && onSubmit != null && submitEnabled(formState),
                 modifier = Modifier
                     .fillMaxWidth(0.8f)
-                    .height(48.dp)
+                    .height(42.25.dp)
                     .align(Alignment.CenterHorizontally),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
+                    containerColor = com.liujiaming.videohub.ui.theme.ActiveGreen,
+                    contentColor = Color.White,
                     disabledContainerColor = ButtonDisabledGray,
                     disabledContentColor = Color.White
                 ),
                 elevation = null
             ) {
                 Text(
-                    text = "添加",
+                    text = if (isSubmitting) "登录中..." else submitText,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 0.sp
@@ -138,17 +168,17 @@ private fun MediaServerFormTopBar(
 @Composable
 private fun FormInputField(
     label: String,
-    initialValue: String = "",
+    value: String,
+    onValueChange: (String) -> Unit,
     hint: String = "",
     isPassword: Boolean = false
 ) {
-    var value by remember { mutableStateOf(initialValue) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 10.5.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -164,7 +194,7 @@ private fun FormInputField(
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(44.dp)
+                .height(39.dp)
                 .background(FormInputBackground, RoundedCornerShape(8.dp))
                 .border(1.dp, FormBorderGray, RoundedCornerShape(8.dp))
                 .padding(start = 12.dp, end = if (isPassword) 42.dp else 12.dp),
@@ -172,7 +202,7 @@ private fun FormInputField(
         ) {
             BasicTextField(
                 value = value,
-                onValueChange = { value = it },
+                onValueChange = onValueChange,
                 singleLine = true,
                 textStyle = TextStyle(
                     color = PrimaryText,

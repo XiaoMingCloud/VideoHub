@@ -237,7 +237,7 @@ private fun SettingsSwitchItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -272,7 +272,7 @@ private fun SettingsValueItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 18.dp),
+            .padding(horizontal = 16.dp, vertical = 15.85.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -331,7 +331,7 @@ private fun AppearanceSelectionDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onAppearanceSelected(appearance) }
-                            .padding(vertical = 12.dp)
+                            .padding(vertical = 10.5.dp)
                     )
                 }
             }
@@ -376,7 +376,7 @@ private fun LanguageSelectionDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onLanguageSelected(language) }
-                            .padding(vertical = 12.dp)
+                            .padding(vertical = 10.5.dp)
                     )
                 }
             }
@@ -394,7 +394,7 @@ private fun SettingsStepperItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -416,7 +416,7 @@ private fun SettingsStepperItem(
 
             Row(
                 modifier = Modifier
-                    .height(32.dp)
+                    .height(28.25.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(StepperBackground),
                 verticalAlignment = Alignment.CenterVertically
@@ -436,7 +436,7 @@ private fun SettingsStepperItem(
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(16.dp)
+                        .height(14.15.dp)
                         .background(StepperDivider)
                 )
 

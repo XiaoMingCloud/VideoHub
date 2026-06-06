@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -32,19 +34,19 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.theme.ActiveGreen
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
@@ -53,6 +55,9 @@ private val StepperDivider = Color(0xFFC7C7CC)
 
 @Composable
 fun GeneralSettingsScreen(onBackClick: () -> Unit) {
+    val showAppearanceDialog = remember { mutableStateOf(false) }
+    val showOnlineMetadataLanguageDialog = remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = BackgroundGray
     ) { paddingValues ->
@@ -72,15 +77,33 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 GeneralSettingsCard {
-                    SettingsSwitchItem("隐藏剧透", false)
+                    SettingsSwitchItem(
+                        title = "隐藏剧透",
+                        checked = SettingsMemory.hideSpoilers,
+                        onCheckedChange = SettingsMemory::updateHideSpoilers
+                    )
                     ItemDivider()
-                    SettingsValueItem("媒体排序方式", "添加日期 ↓")
+                    SettingsSwitchItem(
+                        title = "触感反馈",
+                        checked = SettingsMemory.hapticFeedback,
+                        onCheckedChange = SettingsMemory::updateHapticFeedback
+                    )
                     ItemDivider()
-                    SettingsValueItem("文件排序方式", "添加日期 ↓")
+                    SettingsValueItem("媒体排序方式", SettingsMemory.mediaSort)
                     ItemDivider()
-                    SettingsValueItem("外观", "自动")
+                    SettingsValueItem("文件排序方式", SettingsMemory.fileSort)
                     ItemDivider()
-                    SettingsValueItem("在线影视数据语言", "自动")
+                    SettingsValueItem(
+                        title = "外观",
+                        value = SettingsMemory.appearance,
+                        onClick = { showAppearanceDialog.value = true }
+                    )
+                    ItemDivider()
+                    SettingsValueItem(
+                        title = "在线影视数据语言",
+                        value = SettingsMemory.onlineMetadataLanguage,
+                        onClick = { showOnlineMetadataLanguageDialog.value = true }
+                    )
                 }
 
                 Text(
@@ -92,18 +115,64 @@ fun GeneralSettingsScreen(onBackClick: () -> Unit) {
                 )
 
                 GeneralSettingsCard {
-                    SettingsSwitchItem("允许使用蜂窝网络", false)
+                    SettingsSwitchItem(
+                        title = "允许使用蜂窝网络",
+                        checked = SettingsMemory.allowCellular,
+                        onCheckedChange = SettingsMemory::updateAllowCellular
+                    )
                     ItemDivider()
-                    SettingsStepperItem("并发数", 3)
+                    SettingsSwitchItem(
+                        title = "蜂窝网络切换提醒",
+                        checked = SettingsMemory.cellularSwitchReminder,
+                        onCheckedChange = SettingsMemory::updateCellularSwitchReminder
+                    )
                     ItemDivider()
-                    SettingsSwitchItem("显示悬浮窗", true)
+                    SettingsStepperItem(
+                        title = "并发数",
+                        value = SettingsMemory.downloadConcurrency,
+                        onValueChange = SettingsMemory::updateDownloadConcurrency
+                    )
                     ItemDivider()
-                    SettingsSwitchItem("播放时暂停", false)
+                    SettingsSwitchItem(
+                        title = "显示悬浮窗",
+                        checked = SettingsMemory.showFloatingWindow,
+                        onCheckedChange = SettingsMemory::updateShowFloatingWindow
+                    )
+                    ItemDivider()
+                    SettingsSwitchItem(
+                        title = "播放时暂停",
+                        checked = SettingsMemory.pauseWhenPlaying,
+                        onCheckedChange = SettingsMemory::updatePauseWhenPlaying
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (showAppearanceDialog.value) {
+        AppearanceSelectionDialog(
+            selectedAppearance = SettingsMemory.appearance,
+            onAppearanceSelected = { appearance ->
+                SettingsMemory.updateAppearance(appearance)
+                showAppearanceDialog.value = false
+            },
+            onDismiss = { showAppearanceDialog.value = false }
+        )
+    }
+
+    if (showOnlineMetadataLanguageDialog.value) {
+        LanguageSelectionDialog(
+            title = "在线影视数据语言",
+            options = MetadataLanguageOptions.languages,
+            selectedLanguage = SettingsMemory.onlineMetadataLanguage,
+            onLanguageSelected = { language ->
+                SettingsMemory.updateOnlineMetadataLanguage(language)
+                showOnlineMetadataLanguageDialog.value = false
+            },
+            onDismiss = { showOnlineMetadataLanguageDialog.value = false }
+        )
     }
 }
 
@@ -143,7 +212,7 @@ private fun GeneralSettingsCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(content = content)
@@ -162,10 +231,9 @@ private fun ItemDivider() {
 @Composable
 private fun SettingsSwitchItem(
     title: String,
-    initialState: Boolean
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
-    var checked by remember { mutableStateOf(initialState) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -182,7 +250,7 @@ private fun SettingsSwitchItem(
 
         Switch(
             checked = checked,
-            onCheckedChange = { checked = it },
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = ActiveGreen,
@@ -197,12 +265,13 @@ private fun SettingsSwitchItem(
 @Composable
 private fun SettingsValueItem(
     title: String,
-    value: String
+    value: String,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -211,25 +280,117 @@ private fun SettingsValueItem(
             text = title,
             color = PrimaryText,
             fontSize = 16.sp,
-            letterSpacing = 0.sp
+            letterSpacing = 0.sp,
+            modifier = Modifier.weight(1f)
         )
+
+        Spacer(modifier = Modifier.width(12.dp))
 
         Text(
             text = value,
             color = ActiveGreen,
             fontSize = 16.sp,
-            letterSpacing = 0.sp
+            letterSpacing = 0.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1.25f)
         )
     }
 }
 
 @Composable
+private fun AppearanceSelectionDialog(
+    selectedAppearance: String,
+    onAppearanceSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "外观",
+                color = PrimaryText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 240.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                AppearanceOptions.modes.forEach { appearance ->
+                    Text(
+                        text = appearance,
+                        color = if (appearance == selectedAppearance) ActiveGreen else PrimaryText,
+                        fontSize = 16.sp,
+                        fontWeight = if (appearance == selectedAppearance) FontWeight.Medium else FontWeight.Normal,
+                        letterSpacing = 0.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onAppearanceSelected(appearance) }
+                            .padding(vertical = 12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {}
+    )
+}
+
+@Composable
+private fun LanguageSelectionDialog(
+    title: String,
+    options: List<String>,
+    selectedLanguage: String,
+    onLanguageSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = title,
+                color = PrimaryText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                options.forEach { language ->
+                    Text(
+                        text = language,
+                        color = if (language == selectedLanguage) ActiveGreen else PrimaryText,
+                        fontSize = 16.sp,
+                        fontWeight = if (language == selectedLanguage) FontWeight.Medium else FontWeight.Normal,
+                        letterSpacing = 0.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onLanguageSelected(language) }
+                            .padding(vertical = 12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {}
+    )
+}
+
+@Composable
 private fun SettingsStepperItem(
     title: String,
-    initialValue: Int
+    value: Int,
+    onValueChange: (Int) -> Unit
 ) {
-    var value by remember { mutableStateOf(initialValue) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -261,7 +422,7 @@ private fun SettingsStepperItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { if (value > 1) value-- },
+                    onClick = { if (value > 1) onValueChange(value - 1) },
                     modifier = Modifier.width(40.dp)
                 ) {
                     Icon(
@@ -280,7 +441,7 @@ private fun SettingsStepperItem(
                 )
 
                 IconButton(
-                    onClick = { value++ },
+                    onClick = { onValueChange(value + 1) },
                     modifier = Modifier.width(40.dp)
                 ) {
                     Icon(

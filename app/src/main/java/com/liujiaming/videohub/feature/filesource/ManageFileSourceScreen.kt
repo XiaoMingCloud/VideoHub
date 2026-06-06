@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
@@ -43,7 +44,7 @@ private val AddIconGreen = Color(0xFF2E7D32)
 @Composable
 fun ManageFileSourceScreen(onBackClick: () -> Unit) {
     Scaffold(
-        containerColor = Color.White
+        containerColor = PageBackground
     ) { paddingValues ->
         Column(
             modifier = Modifier

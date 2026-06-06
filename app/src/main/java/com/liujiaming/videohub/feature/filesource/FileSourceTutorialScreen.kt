@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
@@ -137,7 +138,7 @@ private fun TutorialCard(
             .fillMaxWidth()
             .padding(top = 20.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {

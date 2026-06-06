@@ -13,9 +13,11 @@ import com.liujiaming.videohub.feature.fnos.AddFnosScreen
 import com.liujiaming.videohub.feature.jellyfin.AddJellyfinScreen
 import com.liujiaming.videohub.feature.media.MediaLibraryScreen
 import com.liujiaming.videohub.feature.settings.AboutScreen
+import com.liujiaming.videohub.feature.settings.DownloadSettingsScreen
 import com.liujiaming.videohub.feature.settings.GeneralSettingsScreen
 import com.liujiaming.videohub.feature.settings.PlaybackSettingsScreen
 import com.liujiaming.videohub.feature.settings.PlayerInterfaceSettingsScreen
+import com.liujiaming.videohub.feature.settings.ResourceSettingsScreen
 import com.liujiaming.videohub.feature.settings.SubtitleTrackSettingsScreen
 import com.liujiaming.videohub.feature.server.MediaServerScreen
 import com.liujiaming.videohub.feature.settings.SettingsScreen
@@ -72,6 +74,8 @@ fun VideoHubApp() {
 
         VideoHubScreen.Settings -> SettingsScreen(
             onGeneralClick = { currentScreen = VideoHubScreen.GeneralSettings },
+            onResourceClick = { currentScreen = VideoHubScreen.ResourceSettings },
+            onDownloadClick = { currentScreen = VideoHubScreen.DownloadSettings },
             onPlaybackClick = { currentScreen = VideoHubScreen.PlaybackSettings },
             onPlayerInterfaceClick = { currentScreen = VideoHubScreen.PlayerInterfaceSettings },
             onSubtitleTrackClick = { currentScreen = VideoHubScreen.SubtitleTrackSettings },
@@ -82,6 +86,14 @@ fun VideoHubApp() {
         )
 
         VideoHubScreen.GeneralSettings -> GeneralSettingsScreen(
+            onBackClick = { currentScreen = VideoHubScreen.Settings }
+        )
+
+        VideoHubScreen.ResourceSettings -> ResourceSettingsScreen(
+            onBackClick = { currentScreen = VideoHubScreen.Settings }
+        )
+
+        VideoHubScreen.DownloadSettings -> DownloadSettingsScreen(
             onBackClick = { currentScreen = VideoHubScreen.Settings }
         )
 
@@ -114,6 +126,8 @@ private enum class VideoHubScreen {
     ManageFileSource,
     Settings,
     GeneralSettings,
+    ResourceSettings,
+    DownloadSettings,
     PlaybackSettings,
     PlayerInterfaceSettings,
     SubtitleTrackSettings,

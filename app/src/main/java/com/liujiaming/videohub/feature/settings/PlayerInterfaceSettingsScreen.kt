@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -27,10 +28,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,10 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.theme.ActiveGreen
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 
 @Composable
 fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
+    val showAutoHideControlPanelDialog = remember { mutableStateOf(false) }
+    val showProgressRightTimeDialog = remember { mutableStateOf(false) }
+    val showLongPressSpeedDialog = remember { mutableStateOf(false) }
+
     Scaffold(containerColor = BackgroundGray) { paddingValues ->
         Column(
             modifier = Modifier
@@ -60,20 +64,79 @@ fun PlayerInterfaceSettingsScreen(onBackClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 PlayerInterfaceCard {
-                    SettingValueItem("自动隐藏播放控制面板", "5秒")
+                    SettingValueItem(
+                        title = "自动隐藏播放控制面板",
+                        value = SettingsMemory.autoHideControlPanel,
+                        onClick = { showAutoHideControlPanelDialog.value = true }
+                    )
                     ItemDivider()
-                    SettingValueItem("进度条右侧时间", "视频总时长")
+                    SettingValueItem(
+                        title = "进度条右侧时间",
+                        value = SettingsMemory.progressRightTime,
+                        onClick = { showProgressRightTimeDialog.value = true }
+                    )
                     ItemDivider()
-                    SettingValueItem("长按倍速播放", "2x")
+                    SettingValueItem(
+                        title = "长按倍速播放",
+                        value = SettingsMemory.longPressSpeed,
+                        onClick = { showLongPressSpeedDialog.value = true }
+                    )
                     ItemDivider()
-                    SettingSwitchItem("双击屏幕两侧快进/快退", true)
+                    SettingSwitchItem(
+                        title = "双击屏幕两侧快进/快退",
+                        checked = SettingsMemory.doubleTapSeek,
+                        onCheckedChange = SettingsMemory::updateDoubleTapSeek
+                    )
                     ItemDivider()
-                    SettingSwitchItem("默认横向显示", false)
+                    SettingSwitchItem(
+                        title = "默认横向显示",
+                        checked = SettingsMemory.defaultLandscape,
+                        onCheckedChange = SettingsMemory::updateDefaultLandscape
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (showAutoHideControlPanelDialog.value) {
+        PlayerInterfaceOptionDialog(
+            title = "自动隐藏播放控制面板",
+            options = PlayerInterfaceOptions.autoHideControlPanelDurations,
+            selectedOption = SettingsMemory.autoHideControlPanel,
+            onOptionSelected = { option ->
+                SettingsMemory.updateAutoHideControlPanel(option)
+                showAutoHideControlPanelDialog.value = false
+            },
+            onDismiss = { showAutoHideControlPanelDialog.value = false }
+        )
+    }
+
+    if (showProgressRightTimeDialog.value) {
+        PlayerInterfaceOptionDialog(
+            title = "进度条右侧时间",
+            options = PlayerInterfaceOptions.progressRightTimeModes,
+            selectedOption = SettingsMemory.progressRightTime,
+            onOptionSelected = { option ->
+                SettingsMemory.updateProgressRightTime(option)
+                showProgressRightTimeDialog.value = false
+            },
+            onDismiss = { showProgressRightTimeDialog.value = false }
+        )
+    }
+
+    if (showLongPressSpeedDialog.value) {
+        PlayerInterfaceOptionDialog(
+            title = "长按倍速播放",
+            options = PlayerInterfaceOptions.longPressSpeeds,
+            selectedOption = SettingsMemory.longPressSpeed,
+            onOptionSelected = { option ->
+                SettingsMemory.updateLongPressSpeed(option)
+                showLongPressSpeedDialog.value = false
+            },
+            onDismiss = { showLongPressSpeedDialog.value = false }
+        )
     }
 }
 
@@ -113,7 +176,7 @@ private fun PlayerInterfaceCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(content = content)
@@ -132,12 +195,13 @@ private fun ItemDivider() {
 @Composable
 private fun SettingValueItem(
     title: String,
-    value: String
+    value: String,
+    onClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 18.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -159,12 +223,51 @@ private fun SettingValueItem(
 }
 
 @Composable
+private fun PlayerInterfaceOptionDialog(
+    title: String,
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = title,
+                color = PrimaryText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                options.forEach { option ->
+                    Text(
+                        text = option,
+                        color = if (option == selectedOption) ActiveGreen else PrimaryText,
+                        fontSize = 16.sp,
+                        fontWeight = if (option == selectedOption) FontWeight.Medium else FontWeight.Normal,
+                        letterSpacing = 0.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOptionSelected(option) }
+                            .padding(vertical = 12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {}
+    )
+}
+
+@Composable
 private fun SettingSwitchItem(
     title: String,
-    initialState: Boolean
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
-    var checked by remember { mutableStateOf(initialState) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -182,7 +285,7 @@ private fun SettingSwitchItem(
 
         Switch(
             checked = checked,
-            onCheckedChange = { checked = it },
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = ActiveGreen,

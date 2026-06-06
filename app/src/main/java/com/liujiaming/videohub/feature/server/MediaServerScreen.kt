@@ -39,6 +39,7 @@ import com.liujiaming.videohub.ui.components.AppListDivider
 import com.liujiaming.videohub.ui.components.BottomNavItem
 import com.liujiaming.videohub.ui.components.FloatingBottomNav
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 import com.liujiaming.videohub.ui.theme.VideoHubTheme
@@ -85,7 +86,7 @@ fun MediaServerScreen(
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
+                colors = CardDefaults.cardColors(containerColor = CardBackground),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column {

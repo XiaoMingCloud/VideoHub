@@ -29,10 +29,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,14 +39,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.theme.ActiveGreen
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
 @Composable
 fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
-    var fastForwardInterval by remember { mutableStateOf("10秒") }
-    var rewindInterval by remember { mutableStateOf("10秒") }
-    var intervalDialogTarget by remember { mutableStateOf<SeekIntervalTarget?>(null) }
+    val intervalDialogTarget = remember { mutableStateOf<SeekIntervalTarget?>(null) }
+    val showCloudVideoOpenModeDialog = remember { mutableStateOf(false) }
+    val showResumePlaybackModeDialog = remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = BackgroundGray
@@ -71,33 +70,65 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
                 PlaybackCard {
                     SettingValueItem(
                         title = "快进间隔",
-                        value = fastForwardInterval,
-                        onClick = { intervalDialogTarget = SeekIntervalTarget.FastForward }
+                        value = SettingsMemory.fastForwardInterval,
+                        onClick = { intervalDialogTarget.value = SeekIntervalTarget.FastForward }
                     )
                     ItemDivider()
                     SettingValueItem(
                         title = "快退间隔",
-                        value = rewindInterval,
-                        onClick = { intervalDialogTarget = SeekIntervalTarget.Rewind }
+                        value = SettingsMemory.rewindInterval,
+                        onClick = { intervalDialogTarget.value = SeekIntervalTarget.Rewind }
                     )
                     ItemDivider()
-                    SettingValueItem("默认画质", "自动")
+                    SettingValueItem(
+                        title = "打开网盘视频时",
+                        value = SettingsMemory.cloudVideoOpenMode,
+                        onClick = { showCloudVideoOpenModeDialog.value = true }
+                    )
                     ItemDivider()
-                    SettingValueItem("默认播放速度", "1.0x")
+                    SettingValueItem(
+                        title = "继续播放",
+                        value = SettingsMemory.resumePlaybackMode,
+                        onClick = { showResumePlaybackModeDialog.value = true }
+                    )
                     ItemDivider()
-                    SettingValueItem("字幕偏移", "0秒")
+                    SettingSwitchItem(
+                        title = "连续播放",
+                        checked = SettingsMemory.continuousPlayback,
+                        onCheckedChange = SettingsMemory::updateContinuousPlayback
+                    )
                     ItemDivider()
-                    SettingSwitchItem("连续播放", true)
+                    SettingSwitchItem(
+                        title = "记住播放进度",
+                        checked = SettingsMemory.rememberPlaybackProgress,
+                        onCheckedChange = SettingsMemory::updateRememberPlaybackProgress
+                    )
                     ItemDivider()
-                    SettingSwitchItem("记住播放进度", true)
+                    SettingSwitchItem(
+                        title = "硬件加速",
+                        checked = SettingsMemory.hardwareAcceleration,
+                        onCheckedChange = SettingsMemory::updateHardwareAcceleration
+                    )
                     ItemDivider()
-                    SettingSwitchItem("后台继续播放", false)
+                    SettingValueItem("默认播放速度", SettingsMemory.defaultPlaybackSpeed)
+                    ItemDivider()
+                    SettingValueItem("字幕偏移", SettingsMemory.subtitleOffset)
+                    ItemDivider()
+                    SettingSwitchItem(
+                        title = "后台继续播放",
+                        checked = SettingsMemory.backgroundPlayback,
+                        onCheckedChange = SettingsMemory::updateBackgroundPlayback
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 PlaybackCard {
-                    SettingSwitchItem("自动消除隔行扫描", false)
+                    SettingSwitchItem(
+                        title = "自动消除隔行扫描",
+                        checked = SettingsMemory.autoDeinterlace,
+                        onCheckedChange = SettingsMemory::updateAutoDeinterlace
+                    )
                     Text(
                         text = "删除交错视频中的隔行扫描线。可能会影响非交错视频的播放。请谨慎打开。",
                         color = TextGray,
@@ -114,22 +145,48 @@ fun PlaybackSettingsScreen(onBackClick: () -> Unit) {
         }
     }
 
-    intervalDialogTarget?.let { target ->
+    intervalDialogTarget.value?.let { target ->
         PlaybackOptionDialog(
             title = target.title,
             options = PlaybackOptions.seekIntervals,
             selectedOption = when (target) {
-                SeekIntervalTarget.FastForward -> fastForwardInterval
-                SeekIntervalTarget.Rewind -> rewindInterval
+                SeekIntervalTarget.FastForward -> SettingsMemory.fastForwardInterval
+                SeekIntervalTarget.Rewind -> SettingsMemory.rewindInterval
             },
             onOptionSelected = { option ->
                 when (target) {
-                    SeekIntervalTarget.FastForward -> fastForwardInterval = option
-                    SeekIntervalTarget.Rewind -> rewindInterval = option
+                    SeekIntervalTarget.FastForward -> SettingsMemory.updateFastForwardInterval(option)
+                    SeekIntervalTarget.Rewind -> SettingsMemory.updateRewindInterval(option)
                 }
-                intervalDialogTarget = null
+                intervalDialogTarget.value = null
             },
-            onDismiss = { intervalDialogTarget = null }
+            onDismiss = { intervalDialogTarget.value = null }
+        )
+    }
+
+    if (showCloudVideoOpenModeDialog.value) {
+        PlaybackOptionDialog(
+            title = "打开网盘视频时",
+            options = PlaybackOptions.cloudVideoOpenModes,
+            selectedOption = SettingsMemory.cloudVideoOpenMode,
+            onOptionSelected = { option ->
+                SettingsMemory.updateCloudVideoOpenMode(option)
+                showCloudVideoOpenModeDialog.value = false
+            },
+            onDismiss = { showCloudVideoOpenModeDialog.value = false }
+        )
+    }
+
+    if (showResumePlaybackModeDialog.value) {
+        PlaybackOptionDialog(
+            title = "继续播放",
+            options = PlaybackOptions.resumePlaybackModes,
+            selectedOption = SettingsMemory.resumePlaybackMode,
+            onOptionSelected = { option ->
+                SettingsMemory.updateResumePlaybackMode(option)
+                showResumePlaybackModeDialog.value = false
+            },
+            onDismiss = { showResumePlaybackModeDialog.value = false }
         )
     }
 }
@@ -170,7 +227,7 @@ private fun PlaybackCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(content = content)
@@ -264,10 +321,9 @@ private fun PlaybackOptionDialog(
 @Composable
 private fun SettingSwitchItem(
     title: String,
-    initialState: Boolean
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
-    var checked by remember { mutableStateOf(initialState) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -284,7 +340,7 @@ private fun SettingSwitchItem(
 
         Switch(
             checked = checked,
-            onCheckedChange = { checked = it },
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = ActiveGreen,

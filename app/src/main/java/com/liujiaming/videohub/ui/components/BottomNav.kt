@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.theme.ActiveGreen
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.TextGray
 
 enum class BottomNavItem {
@@ -66,7 +67,7 @@ fun FloatingBottomNav(
                     spotColor = Color.Black.copy(alpha = 0.12f)
                 )
                 .clip(CircleShape)
-                .background(Color.White)
+                .background(CardBackground)
                 .padding(horizontal = 8.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically

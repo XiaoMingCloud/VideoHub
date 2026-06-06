@@ -43,6 +43,7 @@ import com.liujiaming.videohub.ui.theme.ButtonDisabledGray
 import com.liujiaming.videohub.ui.theme.FormBorderGray
 import com.liujiaming.videohub.ui.theme.FormHintGray
 import com.liujiaming.videohub.ui.theme.FormInputBackground
+import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
@@ -53,7 +54,7 @@ fun AddMediaServerFormScreen(
     onBackClick: () -> Unit
 ) {
     Scaffold(
-        containerColor = Color.White
+        containerColor = PageBackground
     ) { paddingValues ->
         Column(
             modifier = Modifier

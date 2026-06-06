@@ -1,6 +1,8 @@
 package com.liujiaming.videohub.feature.settings
 
 object LanguageOptions {
+    const val AUTO_SYSTEM_LANGUAGE = "自动（系统当前语言）"
+
     val commonLanguages = listOf(
         "简体中文",
         "繁体中文",
@@ -40,4 +42,6 @@ object LanguageOptions {
         "越南语",
         "威尔士语"
     )
+
+    val autoAndCommonLanguages = listOf(AUTO_SYSTEM_LANGUAGE) + commonLanguages
 }

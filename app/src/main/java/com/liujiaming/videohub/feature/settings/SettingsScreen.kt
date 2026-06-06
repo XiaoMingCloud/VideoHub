@@ -43,12 +43,15 @@ import com.liujiaming.videohub.ui.components.AppListDivider
 import com.liujiaming.videohub.ui.components.BottomNavItem
 import com.liujiaming.videohub.ui.components.FloatingBottomNav
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.SettingsIconGreen
 
 @Composable
 fun SettingsScreen(
     onGeneralClick: () -> Unit,
+    onResourceClick: () -> Unit,
+    onDownloadClick: () -> Unit,
     onPlaybackClick: () -> Unit,
     onPlayerInterfaceClick: () -> Unit,
     onSubtitleTrackClick: () -> Unit,
@@ -88,9 +91,9 @@ fun SettingsScreen(
             SettingsCard {
                 SettingsItem("通用", Icons.Default.Settings, onGeneralClick)
                 AppListDivider()
-                SettingsItem("资源", Icons.Default.Storage)
+                SettingsItem("资源", Icons.Default.Storage, onResourceClick)
                 AppListDivider()
-                SettingsItem("下载", Icons.Default.Download)
+                SettingsItem("下载", Icons.Default.Download, onDownloadClick)
                 AppListDivider()
                 SettingsItem("同步", Icons.Default.Sync)
             }
@@ -125,7 +128,7 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(content = content)

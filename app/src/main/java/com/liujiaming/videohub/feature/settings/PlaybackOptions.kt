@@ -12,4 +12,15 @@ object PlaybackOptions {
         "60秒",
         "自定义"
     )
+
+    val cloudVideoOpenModes = listOf(
+        "播放原画",
+        "播放最高分辨率视频流"
+    )
+
+    val resumePlaybackModes = listOf(
+        "每次询问",
+        "继续播放",
+        "从头开始"
+    )
 }

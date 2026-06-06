@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.components.BottomNavItem
 import com.liujiaming.videohub.ui.components.FloatingBottomNav
 import com.liujiaming.videohub.ui.theme.ActiveGreen
+import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
@@ -48,7 +49,7 @@ fun FileSourceScreen(
     onSettingsClick: () -> Unit
 ) {
     Scaffold(
-        containerColor = Color.White,
+        containerColor = PageBackground,
         bottomBar = {
             FloatingBottomNav(
                 activeItem = BottomNavItem.File,

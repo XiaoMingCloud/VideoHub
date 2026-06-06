@@ -49,6 +49,7 @@ import com.liujiaming.videohub.R
 import com.liujiaming.videohub.ui.components.BottomNavItem
 import com.liujiaming.videohub.ui.components.FloatingBottomNav
 import com.liujiaming.videohub.ui.theme.ActiveGreen
+import com.liujiaming.videohub.ui.theme.PageBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
@@ -61,7 +62,7 @@ fun MediaLibraryScreen(
     onSettingsClick: () -> Unit
 ) {
     Scaffold(
-        containerColor = Color.White,
+        containerColor = PageBackground,
         bottomBar = {
             FloatingBottomNav(
                 activeItem = BottomNavItem.Media,
@@ -76,7 +77,7 @@ fun MediaLibraryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
+                .background(PageBackground)
         ) {
             PosterBackdrop()
             TopActions(modifier = Modifier.align(Alignment.TopCenter))
@@ -125,15 +126,16 @@ private fun PosterBackdrop() {
             }
         }
 
+        val scrim = PageBackground
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.74f),
-                            Color.White.copy(alpha = 0.94f),
-                            Color.White
+                            scrim.copy(alpha = 0.74f),
+                            scrim.copy(alpha = 0.94f),
+                            scrim
                         )
                     )
                 )

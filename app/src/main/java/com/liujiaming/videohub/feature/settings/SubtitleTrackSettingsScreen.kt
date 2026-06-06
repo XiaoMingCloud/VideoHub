@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -29,26 +30,25 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.ui.theme.ActiveGreen
 import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
 import com.liujiaming.videohub.ui.theme.PrimaryText
 
 @Composable
 fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
-    var builtInSubtitleLanguage by remember { mutableStateOf("简体中文") }
-    var onlineSubtitleLanguage by remember { mutableStateOf("简体中文") }
-    var defaultAudioLanguage by remember { mutableStateOf("简体中文") }
-    var languageDialogTarget by remember { mutableStateOf<LanguageDialogTarget?>(null) }
+    val showExternalSubtitleRuleDialog = remember { mutableStateOf(false) }
+    val languageDialogTarget = remember { mutableStateOf<LanguageDialogTarget?>(null) }
 
     Scaffold(containerColor = BackgroundGray) { paddingValues ->
         Column(
@@ -67,20 +67,28 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 SubtitleTrackCard {
-                    SettingValueItem("自动加载外挂字幕规则", "同目录...字幕")
+                    SettingValueItem(
+                        title = "自动加载外挂字幕规则",
+                        value = SettingsMemory.externalSubtitleRule.toExternalSubtitleRuleDisplayText(),
+                        onClick = { showExternalSubtitleRuleDialog.value = true }
+                    )
                     ItemDivider()
-                    SettingSwitchItem("自动加载内置字幕", true)
+                    SettingSwitchItem(
+                        title = "自动加载内置字幕",
+                        checked = SettingsMemory.autoLoadBuiltInSubtitle,
+                        onCheckedChange = SettingsMemory::updateAutoLoadBuiltInSubtitle
+                    )
                     ItemDivider()
                     SettingValueItem(
                         title = "自动加载内置字幕语言",
-                        value = builtInSubtitleLanguage,
-                        onClick = { languageDialogTarget = LanguageDialogTarget.BuiltInSubtitle }
+                        value = SettingsMemory.builtInSubtitleLanguage,
+                        onClick = { languageDialogTarget.value = LanguageDialogTarget.BuiltInSubtitle }
                     )
                     ItemDivider()
                     SettingValueItem(
                         title = "在线字幕搜索语言",
-                        value = onlineSubtitleLanguage,
-                        onClick = { languageDialogTarget = LanguageDialogTarget.OnlineSubtitle }
+                        value = SettingsMemory.onlineSubtitleLanguage,
+                        onClick = { languageDialogTarget.value = LanguageDialogTarget.OnlineSubtitle }
                     )
                 }
 
@@ -89,8 +97,8 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
                 SubtitleTrackCard {
                     SettingValueItem(
                         title = "默认音轨语言",
-                        value = defaultAudioLanguage,
-                        onClick = { languageDialogTarget = LanguageDialogTarget.DefaultAudio }
+                        value = SettingsMemory.defaultAudioLanguage,
+                        onClick = { languageDialogTarget.value = LanguageDialogTarget.DefaultAudio }
                     )
                 }
 
@@ -99,23 +107,36 @@ fun SubtitleTrackSettingsScreen(onBackClick: () -> Unit) {
         }
     }
 
-    languageDialogTarget?.let { target ->
+    if (showExternalSubtitleRuleDialog.value) {
+        OptionSelectionDialog(
+            title = "自动加载外挂字幕规则",
+            options = SubtitleTrackOptions.externalSubtitleRules,
+            selectedOption = SettingsMemory.externalSubtitleRule,
+            onOptionSelected = { option ->
+                SettingsMemory.updateExternalSubtitleRule(option)
+                showExternalSubtitleRuleDialog.value = false
+            },
+            onDismiss = { showExternalSubtitleRuleDialog.value = false }
+        )
+    }
+
+    languageDialogTarget.value?.let { target ->
         LanguageSelectionDialog(
             title = target.title,
             selectedLanguage = when (target) {
-                LanguageDialogTarget.BuiltInSubtitle -> builtInSubtitleLanguage
-                LanguageDialogTarget.OnlineSubtitle -> onlineSubtitleLanguage
-                LanguageDialogTarget.DefaultAudio -> defaultAudioLanguage
+                LanguageDialogTarget.BuiltInSubtitle -> SettingsMemory.builtInSubtitleLanguage
+                LanguageDialogTarget.OnlineSubtitle -> SettingsMemory.onlineSubtitleLanguage
+                LanguageDialogTarget.DefaultAudio -> SettingsMemory.defaultAudioLanguage
             },
             onLanguageSelected = { language ->
                 when (target) {
-                    LanguageDialogTarget.BuiltInSubtitle -> builtInSubtitleLanguage = language
-                    LanguageDialogTarget.OnlineSubtitle -> onlineSubtitleLanguage = language
-                    LanguageDialogTarget.DefaultAudio -> defaultAudioLanguage = language
+                    LanguageDialogTarget.BuiltInSubtitle -> SettingsMemory.updateBuiltInSubtitleLanguage(language)
+                    LanguageDialogTarget.OnlineSubtitle -> SettingsMemory.updateOnlineSubtitleLanguage(language)
+                    LanguageDialogTarget.DefaultAudio -> SettingsMemory.updateDefaultAudioLanguage(language)
                 }
-                languageDialogTarget = null
+                languageDialogTarget.value = null
             },
-            onDismiss = { languageDialogTarget = null }
+            onDismiss = { languageDialogTarget.value = null }
         )
     }
 }
@@ -156,7 +177,7 @@ private fun SubtitleTrackCard(content: @Composable ColumnScope.() -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(content = content)
@@ -190,16 +211,73 @@ private fun SettingValueItem(
             text = title,
             color = PrimaryText,
             fontSize = 16.sp,
-            letterSpacing = 0.sp
+            letterSpacing = 0.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Clip,
+            modifier = Modifier.weight(1f, fill = false)
         )
+
+        Spacer(modifier = Modifier.width(12.dp))
 
         Text(
             text = value,
             color = ActiveGreen,
             fontSize = 16.sp,
-            letterSpacing = 0.sp
+            textAlign = TextAlign.End,
+            letterSpacing = 0.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
     }
+}
+
+private fun String.toExternalSubtitleRuleDisplayText(): String {
+    return when (this) {
+        "同目录下的同名字幕",
+        "同目录下的所有字幕" -> "同目录...字幕"
+        else -> this
+    }
+}
+
+@Composable
+private fun OptionSelectionDialog(
+    title: String,
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = title,
+                color = PrimaryText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.sp
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                options.forEach { option ->
+                    Text(
+                        text = option,
+                        color = if (option == selectedOption) ActiveGreen else PrimaryText,
+                        fontSize = 16.sp,
+                        fontWeight = if (option == selectedOption) FontWeight.Medium else FontWeight.Normal,
+                        letterSpacing = 0.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOptionSelected(option) }
+                            .padding(vertical = 12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {}
+    )
 }
 
 @Composable
@@ -255,10 +333,9 @@ private enum class LanguageDialogTarget(val title: String) {
 @Composable
 private fun SettingSwitchItem(
     title: String,
-    initialState: Boolean
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
 ) {
-    var checked by remember { mutableStateOf(initialState) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -276,7 +353,7 @@ private fun SettingSwitchItem(
 
         Switch(
             checked = checked,
-            onCheckedChange = { checked = it },
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = ActiveGreen,

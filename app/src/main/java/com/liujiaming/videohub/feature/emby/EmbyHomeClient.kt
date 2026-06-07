@@ -1,5 +1,6 @@
 package com.liujiaming.videohub.feature.emby
 
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -14,6 +15,43 @@ import java.net.URL
  * 所有网络请求使用 HttpURLConnection 实现，统一通过 X-Emby-Token 进行鉴权。
  */
 object EmbyHomeClient {
+    private const val TAG = "EmbyHomeClient"
+
+    fun fetchLibraryItemsPage(
+        session: EmbyAuthSession,
+        libraryId: String,
+        startIndex: Int,
+        limit: Int
+    ): EmbyLibraryItemsPage {
+        val json = getJsonObject(
+            session = session,
+            path = "/Users/${session.userId}/Items",
+            query = mapOf(
+                "ParentId" to libraryId,
+                "Recursive" to "true",
+                "IncludeItemTypes" to "Movie,Series,Episode,Video,Folder",
+                "StartIndex" to startIndex.coerceAtLeast(0).toString(),
+                "Limit" to limit.coerceAtLeast(1).toString(),
+                "SortBy" to "DateCreated",
+                "SortOrder" to "Descending"
+            )
+        )
+        val items = json.optJSONArray("Items") ?: JSONArray()
+        Log.d(
+            TAG,
+            "fetchLibraryItemsPage libraryId=$libraryId startIndex=$startIndex limit=$limit " +
+                "items=${items.length()} total=${json.optInt("TotalRecordCount", -1)}"
+        )
+        return EmbyLibraryItemsPage(
+            items = buildList {
+                for (index in 0 until items.length()) {
+                    add(items.getJSONObject(index).toMediaItem(session))
+                }
+            },
+            totalRecordCount = json.optInt("TotalRecordCount", startIndex)
+        )
+    }
+
     /**
      * 拉取 Emby 首页的全部媒体数据。
      * 包括：媒体库列表、继续观看列表、每个媒体库的详情分区。
@@ -251,6 +289,7 @@ object EmbyHomeClient {
         query: Map<String, String>
     ): String {
         val url = buildUrl(session.serverUrl, path, query)
+        Log.d(TAG, "GET $path query=$query")
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 10000       // 连接超时 10 秒
@@ -268,6 +307,7 @@ object EmbyHomeClient {
         }
         val response = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
         connection.disconnect()
+        Log.d(TAG, "GET $path responseCode=$responseCode responseLength=${response.length}")
 
         if (responseCode !in 200..299) {
             throw EmbyAuthException("获取 Emby 媒体库失败($responseCode): $response")
@@ -327,6 +367,11 @@ data class EmbyLibrarySection(
     val libraryId: String,
     val title: String,
     val items: List<EmbyMediaItem>
+)
+
+data class EmbyLibraryItemsPage(
+    val items: List<EmbyMediaItem>,
+    val totalRecordCount: Int
 )
 
 /**

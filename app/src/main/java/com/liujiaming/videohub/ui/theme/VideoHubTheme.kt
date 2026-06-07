@@ -65,7 +65,8 @@ fun VideoHubTheme(content: @Composable () -> Unit) {
     SideEffect {
         SettingsMemory.updateResolvedDarkMode(isDark)
         val window = (view.context as? Activity)?.window ?: return@SideEffect
-        window.statusBarColor = rootBackgroundColor.toArgb()
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.Transparent.toArgb()
         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
     }
 

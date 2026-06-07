@@ -1,8 +1,10 @@
 package com.liujiaming.videohub
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.view.WindowCompat
 import com.liujiaming.videohub.feature.settings.SettingsMemory
 import com.liujiaming.videohub.navigation.VideoHubApp
 import com.liujiaming.videohub.ui.theme.VideoHubTheme
@@ -19,6 +21,8 @@ class MainActivity : ComponentActivity() {
      */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
         // 初始化设置记忆，传入当前 Activity 上下文用于 SharedPreferences 访问
         SettingsMemory.init(this)
         setContent {

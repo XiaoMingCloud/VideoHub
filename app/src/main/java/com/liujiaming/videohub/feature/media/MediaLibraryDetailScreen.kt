@@ -75,18 +75,21 @@ private const val TAG = "MediaLibraryDetail"
 @Composable
 fun MediaLibraryDetailScreen(
     libraryId: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onMediaClick: (MediaBrowseItem) -> Unit = {}
 ) {
     MediaLibraryDetailScreen(
         initialRequest = MediaBrowseRequest(MediaSourceType.Emby, libraryId),
-        onBackClick = onBackClick
+        onBackClick = onBackClick,
+        onMediaClick = onMediaClick
     )
 }
 
 @Composable
 fun MediaLibraryDetailScreen(
     initialRequest: MediaBrowseRequest,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onMediaClick: (MediaBrowseItem) -> Unit = {}
 ) {
     val context = LocalContext.current
     val gridState = rememberLazyGridState()
@@ -384,6 +387,7 @@ fun MediaLibraryDetailScreen(
                 reachedEnd = activeReachedEnd,
                 errorText = activeErrorText,
                 gridState = gridState,
+                onMediaClick = onMediaClick,
                 onFolderClick = { folder ->
                     browseStack = browseStack + MediaBrowseRequest(
                         sourceType = browseRequest.sourceType,
@@ -405,6 +409,7 @@ private fun MediaDetailGrid(
     reachedEnd: Boolean,
     errorText: String?,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    onMediaClick: (MediaBrowseItem) -> Unit,
     onFolderClick: (MediaBrowseItem) -> Unit
 ) {
     LazyVerticalGrid(
@@ -423,6 +428,7 @@ private fun MediaDetailGrid(
         items(items, key = { it.id.ifBlank { it.name } }) { item ->
             MediaDetailGridItem(
                 item = item,
+                onMediaClick = onMediaClick,
                 onFolderClick = onFolderClick
             )
         }
@@ -602,13 +608,14 @@ private fun MediaDetailTabButton(
 @Composable
 private fun MediaDetailGridItem(
     item: MediaBrowseItem,
+    onMediaClick: (MediaBrowseItem) -> Unit,
     onFolderClick: (MediaBrowseItem) -> Unit
 ) {
     Column(
         modifier = if (item.isFolder) {
             Modifier.clickable { onFolderClick(item) }
         } else {
-            Modifier
+            Modifier.clickable { onMediaClick(item) }
         }
     ) {
         Box(

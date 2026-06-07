@@ -21,7 +21,10 @@ import com.liujiaming.videohub.feature.fnos.AddFnosScreen
 import com.liujiaming.videohub.feature.jellyfin.AddJellyfinScreen
 import com.liujiaming.videohub.feature.media.MediaLibraryDetailScreen
 import com.liujiaming.videohub.feature.media.MediaLibraryScreen
+import com.liujiaming.videohub.feature.media.MediaBrowseItem
+import com.liujiaming.videohub.feature.media.MediaItemDetailScreen
 import com.liujiaming.videohub.feature.settings.AboutScreen
+import com.liujiaming.videohub.feature.media.MediaPlayerScreen
 import com.liujiaming.videohub.feature.settings.DownloadSettingsScreen
 import com.liujiaming.videohub.feature.settings.GeneralSettingsScreen
 import com.liujiaming.videohub.feature.settings.PlaybackSettingsScreen
@@ -48,6 +51,7 @@ fun VideoHubApp() {
     // 记录上一次按下返回键的时间戳，用于双击退出判断
     var lastExitPressTime by remember { mutableStateOf(0L) }
     var selectedLibraryId by remember { mutableStateOf("") }
+    var selectedMediaItem by remember { mutableStateOf<MediaBrowseItem?>(null) }
 
     /**
      * 导航到指定页面，将新页面压入返回栈。
@@ -117,6 +121,24 @@ fun VideoHubApp() {
 
         VideoHubScreen.MediaLibraryDetail -> MediaLibraryDetailScreen(
             libraryId = selectedLibraryId,
+            onBackClick = ::goBack,
+            onMediaClick = { item ->
+                selectedMediaItem = item
+                navigateTo(VideoHubScreen.MediaItemDetail)
+            }
+        )
+
+        VideoHubScreen.MediaItemDetail -> MediaItemDetailScreen(
+            item = selectedMediaItem,
+            onBackClick = ::goBack,
+            onPlayClick = { item ->
+                selectedMediaItem = item
+                navigateTo(VideoHubScreen.MediaPlayer)
+            }
+        )
+
+        VideoHubScreen.MediaPlayer -> MediaPlayerScreen(
+            item = selectedMediaItem,
             onBackClick = ::goBack
         )
 
@@ -239,6 +261,8 @@ private enum class VideoHubScreen {
     /** 媒体库页面（首页） */
     MediaLibrary,
     MediaLibraryDetail,
+    MediaItemDetail,
+    MediaPlayer,
     /** 影视服务器列表页面 */
     ServerList,
     /** 添加 Emby 服务器页面 */

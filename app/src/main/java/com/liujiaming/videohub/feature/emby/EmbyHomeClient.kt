@@ -17,6 +17,17 @@ import java.net.URL
 object EmbyHomeClient {
     private const val TAG = "EmbyHomeClient"
 
+    fun playbackUrl(session: EmbyAuthSession, itemId: String): String {
+        return buildUrl(
+            baseUrl = session.serverUrl,
+            path = "/Videos/$itemId/stream",
+            query = mapOf(
+                "static" to "true",
+                "api_key" to session.accessToken
+            )
+        )
+    }
+
     fun fetchLibraryItemsPage(
         session: EmbyAuthSession,
         parentId: String,
@@ -111,6 +122,51 @@ object EmbyHomeClient {
             "fetchFirstVideoInFolder folderId=$folderId items=${items.length()} types=${items.typeSummary()}"
         )
         return items.optJSONObject(0)?.toMediaItem(session)
+    }
+
+    fun fetchItemDetail(
+        session: EmbyAuthSession,
+        itemId: String
+    ): EmbyMediaItemDetail {
+        val json = getJsonObject(
+            session = session,
+            path = "/Users/${session.userId}/Items/$itemId",
+            query = mapOf(
+                "Fields" to "Overview,MediaStreams,MediaSources,Path,Genres,Studios,ProductionYear,People"
+            )
+        )
+        val mediaStreams = json.optJSONArray("MediaStreams") ?: JSONArray()
+        val mediaSources = json.optJSONArray("MediaSources") ?: JSONArray()
+        val people = json.optJSONArray("People") ?: JSONArray()
+        Log.d(
+            TAG,
+            "fetchItemDetail itemId=$itemId overview=${json.optString("Overview").length} " +
+                "streams=${mediaStreams.length()} streamTypes=${mediaStreams.streamTypeSummary()} " +
+                "mediaSources=${mediaSources.length()} people=${people.length()}"
+        )
+        return EmbyMediaItemDetail(
+            id = json.optString("Id"),
+            name = json.optString("Name"),
+            overview = json.optString("Overview"),
+            runTimeTicks = json.optLong("RunTimeTicks", 0L),
+            productionYear = json.optInt("ProductionYear", 0).takeIf { it > 0 },
+            path = json.optString("Path"),
+            mediaStreams = buildList {
+                for (index in 0 until mediaStreams.length()) {
+                    mediaStreams.optJSONObject(index)?.let { add(it.toMediaStreamInfo()) }
+                }
+            },
+            mediaSources = buildList {
+                for (index in 0 until mediaSources.length()) {
+                    mediaSources.optJSONObject(index)?.let { add(it.toMediaSourceInfo()) }
+                }
+            },
+            people = buildList {
+                for (index in 0 until people.length()) {
+                    people.optJSONObject(index)?.let { add(it.toPersonInfo(session)) }
+                }
+            }
+        )
     }
 
     /**
@@ -405,6 +461,65 @@ object EmbyHomeClient {
         }
         return counts.entries.joinToString(",") { "${it.key}:${it.value}" }
     }
+
+    private fun JSONArray.streamTypeSummary(): String {
+        val counts = linkedMapOf<String, Int>()
+        for (index in 0 until length()) {
+            val type = optJSONObject(index)?.optString("Type").orEmpty().ifBlank { "Unknown" }
+            counts[type] = (counts[type] ?: 0) + 1
+        }
+        return counts.entries.joinToString(",") { "${it.key}:${it.value}" }
+    }
+
+    private fun JSONObject.toMediaStreamInfo(): EmbyMediaStreamInfo {
+        return EmbyMediaStreamInfo(
+            type = optString("Type"),
+            codec = optString("Codec"),
+            displayTitle = optString("DisplayTitle"),
+            language = optString("Language"),
+            width = optInt("Width", 0).takeIf { it > 0 },
+            height = optInt("Height", 0).takeIf { it > 0 },
+            bitRate = optInt("BitRate", 0).takeIf { it > 0 },
+            profile = optString("Profile"),
+            level = optDouble("Level", 0.0).takeIf { it > 0.0 },
+            aspectRatio = optString("AspectRatio"),
+            scanType = optString("ScanType"),
+            videoRange = optString("VideoRange"),
+            bitDepth = optInt("BitDepth", 0).takeIf { it > 0 },
+            pixelFormat = optString("PixelFormat"),
+            refFrames = optInt("RefFrames", 0).takeIf { it > 0 },
+            frameRate = optDouble("RealFrameRate", 0.0)
+                .takeIf { it > 0.0 }
+                ?: optDouble("AverageFrameRate", 0.0).takeIf { it > 0.0 },
+            channels = optInt("Channels", 0).takeIf { it > 0 },
+            sampleRate = optInt("SampleRate", 0).takeIf { it > 0 },
+            isDefault = optBoolean("IsDefault", false),
+            isForced = optBoolean("IsForced", false)
+        )
+    }
+
+    private fun JSONObject.toMediaSourceInfo(): EmbyMediaSourceInfo {
+        return EmbyMediaSourceInfo(
+            id = optString("Id"),
+            path = optString("Path"),
+            container = optString("Container"),
+            size = optLong("Size", 0L).takeIf { it > 0L },
+            bitRate = optInt("Bitrate", 0).takeIf { it > 0 }
+                ?: optInt("BitRate", 0).takeIf { it > 0 },
+            runTimeTicks = optLong("RunTimeTicks", 0L).takeIf { it > 0L }
+        )
+    }
+
+    private fun JSONObject.toPersonInfo(session: EmbyAuthSession): EmbyPersonInfo {
+        val id = optString("Id")
+        return EmbyPersonInfo(
+            id = id,
+            name = optString("Name"),
+            role = optString("Role"),
+            type = optString("Type"),
+            imageUrl = if (id.isBlank()) "" else imageUrl(session, id, 220)
+        )
+    }
 }
 
 /**
@@ -476,4 +591,56 @@ data class EmbyMediaItem(
     val imageUrl: String,
     val playbackProgress: Float = 0f,
     val played: Boolean = false
+)
+
+data class EmbyMediaItemDetail(
+    val id: String,
+    val name: String,
+    val overview: String,
+    val runTimeTicks: Long,
+    val productionYear: Int?,
+    val path: String,
+    val mediaStreams: List<EmbyMediaStreamInfo>,
+    val mediaSources: List<EmbyMediaSourceInfo>,
+    val people: List<EmbyPersonInfo>
+)
+
+data class EmbyMediaStreamInfo(
+    val type: String,
+    val codec: String,
+    val displayTitle: String,
+    val language: String,
+    val width: Int?,
+    val height: Int?,
+    val bitRate: Int?,
+    val profile: String,
+    val level: Double?,
+    val aspectRatio: String,
+    val scanType: String,
+    val videoRange: String,
+    val bitDepth: Int?,
+    val pixelFormat: String,
+    val refFrames: Int?,
+    val frameRate: Double?,
+    val channels: Int?,
+    val sampleRate: Int?,
+    val isDefault: Boolean,
+    val isForced: Boolean
+)
+
+data class EmbyMediaSourceInfo(
+    val id: String,
+    val path: String,
+    val container: String,
+    val size: Long?,
+    val bitRate: Int?,
+    val runTimeTicks: Long?
+)
+
+data class EmbyPersonInfo(
+    val id: String,
+    val name: String,
+    val role: String,
+    val type: String,
+    val imageUrl: String
 )

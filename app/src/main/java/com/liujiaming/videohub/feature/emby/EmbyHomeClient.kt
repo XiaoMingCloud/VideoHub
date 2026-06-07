@@ -590,7 +590,9 @@ data class EmbyMediaItem(
     val type: String,
     val imageUrl: String,
     val playbackProgress: Float = 0f,
-    val played: Boolean = false
+    val played: Boolean = false,
+    val subtitle: String = "",
+    val sourceType: String = "Emby"
 )
 
 data class EmbyMediaItemDetail(

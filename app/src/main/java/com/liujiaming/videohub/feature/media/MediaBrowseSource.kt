@@ -6,11 +6,14 @@ import com.liujiaming.videohub.feature.emby.EmbyHomeClient
 import com.liujiaming.videohub.feature.emby.EmbyLibraryItemsCache
 import com.liujiaming.videohub.feature.emby.EmbyMediaItem
 import com.liujiaming.videohub.feature.emby.EmbySessionStore
+import com.liujiaming.videohub.feature.bilibili.BilibiliClient
+import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 enum class MediaSourceType {
     Emby,
+    Bilibili,
     Local,
     Smb,
     WebDav
@@ -43,7 +46,9 @@ data class MediaBrowseItem(
     val type: String,
     val imageUrl: String,
     val playbackProgress: Float = 0f,
-    val played: Boolean = false
+    val played: Boolean = false,
+    val subtitle: String = "",
+    val sourceType: MediaSourceType = MediaSourceType.Emby
 ) {
     val isFolder: Boolean
         get() = type.equals("Folder", ignoreCase = true) ||
@@ -79,11 +84,67 @@ object MediaBrowseDataSources {
     fun forType(type: MediaSourceType): MediaBrowseDataSource {
         return when (type) {
             MediaSourceType.Emby -> EmbyMediaBrowseDataSource
+            MediaSourceType.Bilibili -> BilibiliMediaBrowseDataSource
             MediaSourceType.Local,
             MediaSourceType.Smb,
             MediaSourceType.WebDav -> UnsupportedMediaBrowseDataSource(type)
         }
     }
+}
+
+private object BilibiliMediaBrowseDataSource : MediaBrowseDataSource {
+    override suspend fun loadSeed(
+        context: Context,
+        request: MediaBrowseRequest
+    ): MediaBrowseSeed = withContext(Dispatchers.IO) {
+        val session = BilibiliSessionStore.load(context)
+            ?: error("请先扫码登录 Bilibili")
+        val folders = BilibiliClient.fetchFavoriteFolders(session)
+        val folder = folders.firstOrNull { it.id == request.containerId }
+        MediaBrowseSeed(
+            title = request.title ?: folder?.name ?: "Bilibili 收藏",
+            items = emptyList(),
+            totalRecordCount = folder?.itemCount ?: 0,
+            isFromDetailCache = false
+        )
+    }
+
+    override suspend fun fetchPage(
+        context: Context,
+        request: MediaBrowseRequest,
+        startIndex: Int,
+        limit: Int
+    ): MediaBrowsePage = withContext(Dispatchers.IO) {
+        val session = BilibiliSessionStore.load(context)
+            ?: error("请先扫码登录 Bilibili")
+        val page = BilibiliClient.fetchFavoriteResources(
+            session = session,
+            mediaId = request.containerId,
+            startIndex = startIndex,
+            limit = limit
+        )
+        MediaBrowsePage(
+            items = page.items.map { it.toBrowseItem(MediaSourceType.Bilibili) },
+            totalRecordCount = page.totalRecordCount,
+            returnedItemCount = page.items.size
+        )
+    }
+
+    override suspend fun fetchFolderPage(
+        context: Context,
+        request: MediaBrowseRequest,
+        startIndex: Int,
+        limit: Int
+    ): MediaBrowsePage {
+        return MediaBrowsePage(emptyList(), 0, 0)
+    }
+
+    override suspend fun savePage(
+        context: Context,
+        request: MediaBrowseRequest,
+        items: List<MediaBrowseItem>,
+        totalRecordCount: Int
+    ) = Unit
 }
 
 private object EmbyMediaBrowseDataSource : MediaBrowseDataSource {
@@ -229,14 +290,17 @@ private class UnsupportedMediaBrowseDataSource(
     ) = Unit
 }
 
-private fun EmbyMediaItem.toBrowseItem(): MediaBrowseItem {
+private fun EmbyMediaItem.toBrowseItem(sourceTypeOverride: MediaSourceType? = null): MediaBrowseItem {
     return MediaBrowseItem(
         id = id,
         name = name,
         type = type,
         imageUrl = imageUrl,
         playbackProgress = playbackProgress,
-        played = played
+        played = played,
+        subtitle = subtitle,
+        sourceType = sourceTypeOverride ?: runCatching { MediaSourceType.valueOf(sourceType) }
+            .getOrDefault(MediaSourceType.Emby)
     )
 }
 
@@ -247,7 +311,9 @@ private fun MediaBrowseItem.toEmbyItem(): EmbyMediaItem {
         type = type,
         imageUrl = imageUrl,
         playbackProgress = playbackProgress,
-        played = played
+        played = played,
+        subtitle = subtitle,
+        sourceType = sourceType.name
     )
 }
 

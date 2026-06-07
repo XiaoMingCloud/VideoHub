@@ -1,4 +1,4 @@
-package com.liujiaming.videohub.feature.media
+﻿package com.liujiaming.videohub.feature.media
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
@@ -34,6 +34,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -66,6 +68,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.R
+import com.liujiaming.videohub.feature.bilibili.BilibiliClient
+import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
 import com.liujiaming.videohub.feature.emby.EmbyHomeCache
 import com.liujiaming.videohub.feature.emby.EmbyHomeDebugState
 import com.liujiaming.videohub.feature.emby.EmbyHomeDebugStore
@@ -92,33 +96,72 @@ private const val SHOW_EMBY_DEBUG_LOG = false
 fun MediaLibraryScreen(
     onAddFileSourceClick: () -> Unit,
     onAddServerClick: () -> Unit,
+    onAddBilibiliClick: () -> Unit = {},
     onFileClick: () -> Unit,
     onServerClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onLibraryViewAllClick: (String) -> Unit
+    onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
 ) {
     val context = LocalContext.current
     val embySession = remember { EmbySessionStore.load(context) }
-    var mediaHome by remember(embySession?.accessToken) { mutableStateOf<EmbyMediaHome?>(null) }
-    var loadError by remember(embySession?.accessToken) { mutableStateOf<String?>(null) }
-    var debugState by remember(embySession?.accessToken) { mutableStateOf<EmbyHomeDebugState?>(null) }
-
-    LaunchedEffect(embySession?.accessToken) {
-        if (embySession == null) return@LaunchedEffect
-
-        val cachedHome = withContext(Dispatchers.IO) {
-            EmbyHomeCache.load(context, embySession.userId)
+    val bilibiliSession = remember { BilibiliSessionStore.load(context) }
+    val availableSources = remember(embySession?.accessToken, bilibiliSession?.mid) {
+        buildList {
+            if (embySession != null) {
+                add(MediaSourceOption(MediaSourceType.Emby, embySession.serverName.ifBlank { "Emby" }))
+            }
+            if (bilibiliSession != null) {
+                add(MediaSourceOption(MediaSourceType.Bilibili, "Bilibili · ${bilibiliSession.username}"))
+            }
         }
-        debugState = withContext(Dispatchers.IO) {
-            EmbyHomeDebugStore.load(context)
-        }
+    }
+    var selectedSourceType by remember { mutableStateOf(MediaSourceSelectionStore.load(context)) }
+    if (availableSources.isNotEmpty() && availableSources.none { it.type == selectedSourceType }) {
+        selectedSourceType = availableSources.first().type
+    }
+    var mediaHome by remember(selectedSourceType, embySession?.accessToken, bilibiliSession?.mid) {
+        mutableStateOf<EmbyMediaHome?>(null)
+    }
+    var loadError by remember(selectedSourceType, embySession?.accessToken, bilibiliSession?.mid) {
+        mutableStateOf<String?>(null)
+    }
+    var debugState by remember(selectedSourceType, embySession?.accessToken) {
+        mutableStateOf<EmbyHomeDebugState?>(null)
+    }
 
-        if (cachedHome?.home != null) {
-            mediaHome = cachedHome.home.sanitized()
-            loadError = null
-        } else {
-            mediaHome = null
-            loadError = "已连接 Emby，请在设置-资源中刷新在线影视数据"
+    LaunchedEffect(selectedSourceType, embySession?.accessToken, bilibiliSession?.mid) {
+        mediaHome = null
+        loadError = null
+        debugState = null
+
+        when (selectedSourceType) {
+            MediaSourceType.Emby -> {
+                if (embySession == null) return@LaunchedEffect
+                val cachedHome = withContext(Dispatchers.IO) {
+                    EmbyHomeCache.load(context, embySession.userId)
+                }
+                debugState = withContext(Dispatchers.IO) {
+                    EmbyHomeDebugStore.load(context)
+                }
+
+                if (cachedHome?.home != null) {
+                    mediaHome = cachedHome.home.sanitized()
+                } else {
+                    loadError = "已连接 Emby，请在设置-资源中刷新在线影视数据"
+                }
+            }
+            MediaSourceType.Bilibili -> {
+                if (bilibiliSession == null) return@LaunchedEffect
+                val result = withContext(Dispatchers.IO) {
+                    runCatching { BilibiliClient.fetchHome(bilibiliSession) }
+                }
+                result.onSuccess {
+                    mediaHome = it.sanitized()
+                }.onFailure {
+                    loadError = it.message ?: "加载 Bilibili 收藏夹失败"
+                }
+            }
+            else -> Unit
         }
     }
 
@@ -140,17 +183,26 @@ fun MediaLibraryScreen(
                 .padding(paddingValues)
                 .background(PageBackground)
         ) {
-            if (embySession == null) {
+            if (availableSources.isEmpty()) {
                 PosterBackdrop()
                 GuestTopBar(modifier = Modifier.align(Alignment.TopCenter))
                 EmptyMediaLibraryContent(
                     onAddFileSourceClick = onAddFileSourceClick,
                     onAddServerClick = onAddServerClick,
+                    onAddBilibiliClick = onAddBilibiliClick,
                     modifier = Modifier.align(Alignment.Center)
                 )
             } else {
                 ConnectedMediaLibraryContent(
-                    sourceName = mediaHome?.sourceName ?: embySession.serverName.ifBlank { "Emby" },
+                    sourceName = mediaHome?.sourceName
+                        ?: availableSources.firstOrNull { it.type == selectedSourceType }?.name
+                        ?: "媒体库",
+                    sourceType = selectedSourceType,
+                    sourceOptions = availableSources,
+                    onSourceSelected = { option ->
+                        selectedSourceType = option.type
+                        MediaSourceSelectionStore.save(context, option.type)
+                    },
                     mediaHome = mediaHome,
                     errorText = loadError,
                     debugState = debugState,
@@ -160,14 +212,16 @@ fun MediaLibraryScreen(
         }
     }
 }
-
 @Composable
 private fun ConnectedMediaLibraryContent(
     sourceName: String,
+    sourceType: MediaSourceType,
+    sourceOptions: List<MediaSourceOption>,
+    onSourceSelected: (MediaSourceOption) -> Unit,
     mediaHome: EmbyMediaHome?,
     errorText: String?,
     debugState: EmbyHomeDebugState?,
-    onLibraryViewAllClick: (String) -> Unit
+    onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
 ) {
     val home = mediaHome ?: EmbyMediaHome(
         sourceName = sourceName,
@@ -185,7 +239,11 @@ private fun ConnectedMediaLibraryContent(
             .padding(horizontal = 16.dp)
             .padding(bottom = 22.dp)
     ) {
-        ConnectedTopBar(sourceName)
+        ConnectedTopBar(
+            sourceName = sourceName,
+            sourceOptions = sourceOptions,
+            onSourceSelected = onSourceSelected
+        )
 
         if (SHOW_EMBY_DEBUG_LOG && debugState != null) {
             EmbyDebugCard(debugState)
@@ -204,18 +262,24 @@ private fun ConnectedMediaLibraryContent(
         SectionTitle("我的媒体")
         HorizontalLibraryRow(
             libraries = home.libraries,
+            sourceType = sourceType,
             onLibraryClick = onLibraryViewAllClick
         )
 
         SectionTitle("继续观看")
         HorizontalMediaRow(home.resumeItems, emptyText = "暂无继续观看")
 
-        MediaLibrarySections(home, onLibraryViewAllClick)
+        MediaLibrarySections(home, sourceType, onLibraryViewAllClick)
     }
 }
 
 @Composable
-private fun ConnectedTopBar(sourceName: String) {
+private fun ConnectedTopBar(
+    sourceName: String,
+    sourceOptions: List<MediaSourceOption>,
+    onSourceSelected: (MediaSourceOption) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -239,15 +303,32 @@ private fun ConnectedTopBar(sourceName: String) {
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            Text(
-                text = sourceName,
-                color = PrimaryText,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                letterSpacing = 0.sp
-            )
+            Box {
+                Text(
+                    text = "$sourceName ▾",
+                    color = PrimaryText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = 0.sp,
+                    modifier = Modifier.clickable { expanded = true }
+                )
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    sourceOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.name) },
+                            onClick = {
+                                expanded = false
+                                onSourceSelected(option)
+                            }
+                        )
+                    }
+                }
+            }
         }
 
         IconButton(onClick = { }) {
@@ -258,7 +339,6 @@ private fun ConnectedTopBar(sourceName: String) {
         }
     }
 }
-
 @Composable
 private fun SectionTitle(text: String) {
     Text(
@@ -306,10 +386,11 @@ private fun LibrarySectionHeader(title: String, onViewAllClick: () -> Unit) {
 @Composable
 private fun HorizontalLibraryRow(
     libraries: List<EmbyLibrarySummary>,
-    onLibraryClick: (String) -> Unit
+    sourceType: MediaSourceType,
+    onLibraryClick: (MediaBrowseRequest) -> Unit
 ) {
     if (libraries.isEmpty()) {
-        EmptySectionCard("暂无媒体库，请在设置-资源中刷新在线影视数据")
+        EmptySectionCard("暂无媒体库")
         return
     }
 
@@ -317,12 +398,19 @@ private fun HorizontalLibraryRow(
         items(libraries, key = { it.id.ifBlank { it.name } }) { library ->
             LibraryCard(
                 library = library,
-                onClick = { onLibraryClick(library.id) }
+                onClick = {
+                    onLibraryClick(
+                        MediaBrowseRequest(
+                            sourceType = sourceType,
+                            containerId = library.id,
+                            title = library.name
+                        )
+                    )
+                }
             )
         }
     }
 }
-
 @Composable
 private fun LibraryCard(
     library: EmbyLibrarySummary,
@@ -360,7 +448,8 @@ private fun HorizontalMediaRow(items: List<EmbyMediaItem>, emptyText: String) {
 @Composable
 private fun MediaLibrarySections(
     home: EmbyMediaHome,
-    onLibraryViewAllClick: (String) -> Unit
+    sourceType: MediaSourceType,
+    onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
 ) {
     val sections = if (home.librarySections.isNotEmpty()) {
         home.librarySections
@@ -377,12 +466,19 @@ private fun MediaLibrarySections(
     sections.forEach { section ->
         LibrarySectionHeader(
             title = section.title,
-            onViewAllClick = { onLibraryViewAllClick(section.libraryId) }
+            onViewAllClick = {
+                onLibraryViewAllClick(
+                    MediaBrowseRequest(
+                        sourceType = sourceType,
+                        containerId = section.libraryId,
+                        title = section.title
+                    )
+                )
+            }
         )
         HorizontalLibraryContentRow(items = section.items, emptyText = "暂无${section.title}内容")
     }
 }
-
 @Composable
 private fun HorizontalLibraryContentRow(items: List<EmbyMediaItem>, emptyText: String) {
     if (items.isEmpty()) {
@@ -413,7 +509,7 @@ private fun MediaPosterCard(
         ) {
             RemotePoster()
         }
-        CardTextBlock(title = item.name, subtitle = "")
+        CardTextBlock(title = item.name, subtitle = item.subtitle)
     }
 }
 
@@ -756,6 +852,7 @@ private fun GuestTopBar(modifier: Modifier = Modifier) {
 private fun EmptyMediaLibraryContent(
     onAddFileSourceClick: () -> Unit,
     onAddServerClick: () -> Unit,
+    onAddBilibiliClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -792,7 +889,7 @@ private fun EmptyMediaLibraryContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "媒体库为空，请添加文件源或影视服务器，享受您的私人影院。",
+            text = "媒体库为空，请添加文件源、影视服务器或 Bilibili 收藏夹。",
             color = TextGray,
             fontSize = 14.sp,
             lineHeight = 22.sp,
@@ -815,9 +912,21 @@ private fun EmptyMediaLibraryContent(
             icon = Icons.Default.VideoLibrary,
             onClick = onAddServerClick
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        MediaActionButton(
+            text = "添加 Bilibili",
+            icon = Icons.Default.PlayArrow,
+            onClick = onAddBilibiliClick
+        )
     }
 }
 
+data class MediaSourceOption(
+    val type: MediaSourceType,
+    val name: String
+)
 @Composable
 private fun MediaActionButton(
     text: String,

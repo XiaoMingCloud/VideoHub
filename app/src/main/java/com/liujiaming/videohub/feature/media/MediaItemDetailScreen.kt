@@ -1,4 +1,4 @@
-package com.liujiaming.videohub.feature.media
+﻿package com.liujiaming.videohub.feature.media
 
 import android.app.Activity
 import android.graphics.Bitmap
@@ -61,6 +61,9 @@ import com.liujiaming.videohub.feature.emby.EmbyMediaItemDetail
 import com.liujiaming.videohub.feature.emby.EmbyMediaStreamInfo
 import com.liujiaming.videohub.feature.emby.EmbyPersonInfo
 import com.liujiaming.videohub.feature.emby.EmbySessionStore
+import com.liujiaming.videohub.feature.bilibili.BilibiliClient
+import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
+import com.liujiaming.videohub.feature.bilibili.BilibiliVideoDetail
 import com.liujiaming.videohub.feature.settings.SettingsMemory
 import com.liujiaming.videohub.ui.theme.ActiveGreen
 import androidx.core.view.WindowCompat
@@ -92,6 +95,7 @@ fun MediaItemDetailScreen(
     val context = LocalContext.current
     val view = LocalView.current
     var detail by remember(item.id) { mutableStateOf<EmbyMediaItemDetail?>(null) }
+    var bilibiliDetail by remember(item.id) { mutableStateOf<BilibiliVideoDetail?>(null) }
     var detailError by remember(item.id) { mutableStateOf<String?>(null) }
 
     DisposableEffect(Unit) {
@@ -107,21 +111,28 @@ fun MediaItemDetailScreen(
         }
     }
 
-    LaunchedEffect(item.id) {
+    LaunchedEffect(item.id, item.sourceType) {
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                val session = EmbySessionStore.load(context) ?: error("请先登录媒体服务器")
-                EmbyHomeClient.fetchItemDetail(session, item.id)
+                if (item.sourceType == MediaSourceType.Bilibili) {
+                    val session = BilibiliSessionStore.load(context) ?: error("请先扫码登录 Bilibili")
+                    BilibiliDetailResult(BilibiliClient.fetchVideoDetail(session, item.id))
+                } else {
+                    val session = EmbySessionStore.load(context) ?: error("请先登录媒体服务器")
+                    EmbyDetailResult(EmbyHomeClient.fetchItemDetail(session, item.id))
+                }
             }
         }
-        result.onSuccess {
-            detail = it
+        result.onSuccess { value ->
+            when (value) {
+                is EmbyDetailResult -> detail = value.detail
+                is BilibiliDetailResult -> bilibiliDetail = value.detail
+            }
             detailError = null
         }.onFailure {
             detailError = it.message ?: "加载媒体详情失败"
         }
     }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -149,7 +160,7 @@ fun MediaItemDetailScreen(
             )
 
             Text(
-                text = buildMetaText(item, detail),
+                text = buildMetaText(item, detail, bilibiliDetail),
                 color = DetailSubText,
                 fontSize = 14.sp,
                 maxLines = 1,
@@ -162,7 +173,8 @@ fun MediaItemDetailScreen(
 
             SectionLabel("简介")
             Text(
-                text = detail?.overview?.takeIf { it.isNotBlank() }
+                text = bilibiliDetail?.description?.takeIf { it.isNotBlank() }
+                    ?: detail?.overview?.takeIf { it.isNotBlank() }
                     ?: detailError
                     ?: "正在加载简介...",
                 color = DetailSubText,
@@ -172,7 +184,11 @@ fun MediaItemDetailScreen(
                 modifier = Modifier.padding(top = 8.dp)
             )
 
-            CastPeopleSection(detail = detail)
+            if (item.sourceType == MediaSourceType.Bilibili) {
+                BilibiliAuthorSection(bilibiliDetail)
+            } else {
+                CastPeopleSection(detail = detail)
+            }
 
             SectionLabel("音视频字幕信息")
             Row(
@@ -387,6 +403,43 @@ private fun CastPersonCard(person: EmbyPersonInfo) {
 }
 
 @Composable
+private fun BilibiliAuthorSection(detail: BilibiliVideoDetail?) {
+    val author = detail?.authorName?.takeIf { it.isNotBlank() } ?: return
+    SectionLabel("作者")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CachedDetailImage(
+            imageUrl = detail.authorFace,
+            modifier = Modifier
+                .size(52.dp)
+                .clip(CircleShape)
+                .background(DetailCard)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = author,
+                color = DetailText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.sp
+            )
+            Text(
+                text = "Bilibili UP 主",
+                color = DetailSubText,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 3.dp),
+                letterSpacing = 0.sp
+            )
+        }
+    }
+}
+
+@Composable
 private fun PathInfoCard(detail: EmbyMediaItemDetail?) {
     val source = detail?.mediaSources?.firstOrNull()
     val path = source?.path?.takeIf { it.isNotBlank() }
@@ -539,7 +592,18 @@ private fun CachedDetailImage(
     }
 }
 
-private fun buildMetaText(item: MediaBrowseItem, detail: EmbyMediaItemDetail?): String {
+private fun buildMetaText(
+    item: MediaBrowseItem,
+    detail: EmbyMediaItemDetail?,
+    bilibiliDetail: BilibiliVideoDetail? = null
+): String {
+    if (item.sourceType == MediaSourceType.Bilibili) {
+        return listOfNotNull(
+            bilibiliDetail?.durationSeconds?.takeIf { it > 0L }?.let { formatSeconds(it) },
+            item.subtitle.takeIf { it.isNotBlank() },
+            "Bilibili"
+        ).joinToString(" ")
+    }
     val video = detail?.mediaStreams?.firstOrNull { it.type.equals("Video", ignoreCase = true) }
     return listOfNotNull(
         detail?.runTimeTicks?.takeIf { it > 0L }?.let { formatRuntime(it) },
@@ -548,6 +612,17 @@ private fun buildMetaText(item: MediaBrowseItem, detail: EmbyMediaItemDetail?): 
         detail?.productionYear?.toString(),
         item.type.takeIf { it.isNotBlank() }
     ).joinToString(" ")
+}
+
+private fun formatSeconds(totalSeconds: Long): String {
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
 }
 
 private fun formatProgress(progress: Float): String {
@@ -701,3 +776,13 @@ private fun formatRuntime(runTimeTicks: Long): String {
         else -> "${totalSeconds}秒"
     }
 }
+
+private sealed interface MediaDetailLoadResult
+
+private data class EmbyDetailResult(
+    val detail: EmbyMediaItemDetail
+) : MediaDetailLoadResult
+
+private data class BilibiliDetailResult(
+    val detail: BilibiliVideoDetail
+) : MediaDetailLoadResult

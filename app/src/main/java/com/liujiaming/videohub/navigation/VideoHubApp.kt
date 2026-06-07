@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.platform.LocalContext
+import com.liujiaming.videohub.feature.bilibili.AddBilibiliScreen
 import com.liujiaming.videohub.feature.emby.AddEmbyScreen
 import com.liujiaming.videohub.feature.filesource.AddLocalStorageScreen
 import com.liujiaming.videohub.feature.filesource.AddSmbStorageScreen
@@ -22,6 +23,8 @@ import com.liujiaming.videohub.feature.jellyfin.AddJellyfinScreen
 import com.liujiaming.videohub.feature.media.MediaLibraryDetailScreen
 import com.liujiaming.videohub.feature.media.MediaLibraryScreen
 import com.liujiaming.videohub.feature.media.MediaBrowseItem
+import com.liujiaming.videohub.feature.media.MediaBrowseRequest
+import com.liujiaming.videohub.feature.media.MediaSourceType
 import com.liujiaming.videohub.feature.media.MediaItemDetailScreen
 import com.liujiaming.videohub.feature.settings.AboutScreen
 import com.liujiaming.videohub.feature.media.MediaPlayerScreen
@@ -51,6 +54,9 @@ fun VideoHubApp() {
     // 记录上一次按下返回键的时间戳，用于双击退出判断
     var lastExitPressTime by remember { mutableStateOf(0L) }
     var selectedLibraryId by remember { mutableStateOf("") }
+    var selectedBrowseRequest by remember {
+        mutableStateOf<MediaBrowseRequest?>(null)
+    }
     var selectedMediaItem by remember { mutableStateOf<MediaBrowseItem?>(null) }
 
     /**
@@ -110,17 +116,20 @@ fun VideoHubApp() {
         VideoHubScreen.MediaLibrary -> MediaLibraryScreen(
             onAddFileSourceClick = { navigateTo(VideoHubScreen.FileSource) },
             onAddServerClick = { navigateTo(VideoHubScreen.ServerList) },
+            onAddBilibiliClick = { navigateTo(VideoHubScreen.AddBilibili) },
             onFileClick = { switchRoot(VideoHubScreen.FileSource) },
             onServerClick = { switchRoot(VideoHubScreen.ServerList) },
             onSettingsClick = { switchRoot(VideoHubScreen.Settings) },
-            onLibraryViewAllClick = { libraryId ->
-                selectedLibraryId = libraryId
+            onLibraryViewAllClick = { request ->
+                selectedLibraryId = request.containerId
+                selectedBrowseRequest = request
                 navigateTo(VideoHubScreen.MediaLibraryDetail)
             }
         )
 
         VideoHubScreen.MediaLibraryDetail -> MediaLibraryDetailScreen(
-            libraryId = selectedLibraryId,
+            initialRequest = selectedBrowseRequest
+                ?: MediaBrowseRequest(MediaSourceType.Emby, selectedLibraryId),
             onBackClick = ::goBack,
             onMediaClick = { item ->
                 selectedMediaItem = item
@@ -145,6 +154,7 @@ fun VideoHubApp() {
         // 影视服务器列表页面
         VideoHubScreen.ServerList -> MediaServerScreen(
             onEmbyClick = { navigateTo(VideoHubScreen.AddEmby) },
+            onBilibiliClick = { navigateTo(VideoHubScreen.AddBilibili) },
             onEditConnectedEmbyClick = { navigateTo(VideoHubScreen.AddEmby) },
             onJellyfinClick = { navigateTo(VideoHubScreen.AddJellyfin) },
             onFnosClick = { navigateTo(VideoHubScreen.AddFnos) },
@@ -155,6 +165,10 @@ fun VideoHubApp() {
 
         // 添加 Emby 服务器页面
         VideoHubScreen.AddEmby -> AddEmbyScreen(
+            onBackClick = ::goBack
+        )
+
+        VideoHubScreen.AddBilibili -> AddBilibiliScreen(
             onBackClick = ::goBack
         )
 
@@ -267,6 +281,7 @@ private enum class VideoHubScreen {
     ServerList,
     /** 添加 Emby 服务器页面 */
     AddEmby,
+    AddBilibili,
     /** 添加 Jellyfin 服务器页面 */
     AddJellyfin,
     /** 添加 FnOS 服务器页面 */

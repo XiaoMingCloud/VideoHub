@@ -61,6 +61,7 @@ import com.liujiaming.videohub.ui.theme.VideoHubTheme
 @Composable
 fun MediaServerScreen(
     onEmbyClick: () -> Unit = {},
+    onBilibiliClick: () -> Unit = {},
     onEditConnectedEmbyClick: () -> Unit = onEmbyClick,
     onJellyfinClick: () -> Unit = {},
     onFnosClick: () -> Unit = {},
@@ -136,6 +137,8 @@ fun MediaServerScreen(
             ) {
                 Column {
                     ServerListItem("Emby", Icons.Default.PlayCircle, Color(0xFF43A047), onEmbyClick)
+                    AppListDivider()
+                    ServerListItem("Bilibili", Icons.Default.PlayCircle, Color(0xFF00A1D6), onBilibiliClick)
                     AppListDivider()
                     ServerListItem("Jellyfin", Icons.Default.Storage, Color(0xFF5E56D8), onJellyfinClick)
                     AppListDivider()

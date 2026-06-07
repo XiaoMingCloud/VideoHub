@@ -109,6 +109,8 @@ object EmbyHomeCache {
             .put("imageUrl", imageUrl)
             .put("playbackProgress", playbackProgress)
             .put("played", played)
+            .put("subtitle", subtitle)
+            .put("sourceType", sourceType)
     }
 
     // ==================== 反序列化方法（JSON -> 模型） ====================
@@ -153,7 +155,9 @@ object EmbyHomeCache {
             type = optString("type"),
             imageUrl = optString("imageUrl"),
             playbackProgress = optDouble("playbackProgress", 0.0).toFloat().coerceIn(0f, 1f),
-            played = optBoolean("played", false)
+            played = optBoolean("played", false),
+            subtitle = optString("subtitle"),
+            sourceType = optString("sourceType", "Emby")
         )
     }
 

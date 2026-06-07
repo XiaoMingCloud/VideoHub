@@ -61,6 +61,8 @@ object EmbyLibraryItemsCache {
                     .put("imageUrl", item.imageUrl)
                     .put("playbackProgress", item.playbackProgress)
                     .put("played", item.played)
+                    .put("subtitle", item.subtitle)
+                    .put("sourceType", item.sourceType)
             )
         }
         return array
@@ -80,7 +82,9 @@ object EmbyLibraryItemsCache {
                         playbackProgress = item.optDouble("playbackProgress", 0.0)
                             .toFloat()
                             .coerceIn(0f, 1f),
-                        played = item.optBoolean("played", false)
+                        played = item.optBoolean("played", false),
+                        subtitle = item.optString("subtitle"),
+                        sourceType = item.optString("sourceType", "Emby")
                     )
                 )
             }

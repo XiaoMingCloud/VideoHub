@@ -19,7 +19,8 @@ object EmbyHomeClient {
 
     fun fetchLibraryItemsPage(
         session: EmbyAuthSession,
-        libraryId: String,
+        parentId: String,
+        recursive: Boolean,
         startIndex: Int,
         limit: Int
     ): EmbyLibraryItemsPage {
@@ -27,8 +28,8 @@ object EmbyHomeClient {
             session = session,
             path = "/Users/${session.userId}/Items",
             query = mapOf(
-                "ParentId" to libraryId,
-                "Recursive" to "true",
+                "ParentId" to parentId,
+                "Recursive" to recursive.toString(),
                 "IncludeItemTypes" to "Movie,Series,Episode,Video,Folder",
                 "StartIndex" to startIndex.coerceAtLeast(0).toString(),
                 "Limit" to limit.coerceAtLeast(1).toString(),
@@ -39,8 +40,8 @@ object EmbyHomeClient {
         val items = json.optJSONArray("Items") ?: JSONArray()
         Log.d(
             TAG,
-            "fetchLibraryItemsPage libraryId=$libraryId startIndex=$startIndex limit=$limit " +
-                "items=${items.length()} total=${json.optInt("TotalRecordCount", -1)}"
+            "fetchLibraryItemsPage parentId=$parentId recursive=$recursive startIndex=$startIndex limit=$limit " +
+                "items=${items.length()} total=${json.optInt("TotalRecordCount", -1)} types=${items.typeSummary()}"
         )
         return EmbyLibraryItemsPage(
             items = buildList {
@@ -50,6 +51,66 @@ object EmbyHomeClient {
             },
             totalRecordCount = json.optInt("TotalRecordCount", startIndex)
         )
+    }
+
+    fun fetchDirectChildrenPage(
+        session: EmbyAuthSession,
+        parentId: String,
+        startIndex: Int,
+        limit: Int
+    ): EmbyLibraryItemsPage {
+        val json = getJsonObject(
+            session = session,
+            path = "/Users/${session.userId}/Items",
+            query = mapOf(
+                "ParentId" to parentId,
+                "Recursive" to "false",
+                "StartIndex" to startIndex.coerceAtLeast(0).toString(),
+                "Limit" to limit.coerceAtLeast(1).toString(),
+                "SortBy" to "SortName",
+                "SortOrder" to "Ascending"
+            )
+        )
+        val items = json.optJSONArray("Items") ?: JSONArray()
+        Log.d(
+            TAG,
+            "fetchDirectChildrenPage parentId=$parentId startIndex=$startIndex limit=$limit " +
+                "items=${items.length()} total=${json.optInt("TotalRecordCount", -1)} " +
+                "types=${items.typeSummary()}"
+        )
+        return EmbyLibraryItemsPage(
+            items = buildList {
+                for (index in 0 until items.length()) {
+                    add(items.getJSONObject(index).toMediaItem(session))
+                }
+            },
+            totalRecordCount = json.optInt("TotalRecordCount", startIndex)
+        )
+    }
+
+    fun fetchFirstVideoInFolder(
+        session: EmbyAuthSession,
+        folderId: String
+    ): EmbyMediaItem? {
+        val json = getJsonObject(
+            session = session,
+            path = "/Users/${session.userId}/Items",
+            query = mapOf(
+                "ParentId" to folderId,
+                "Recursive" to "true",
+                "IncludeItemTypes" to "Movie,Series,Episode,Video",
+                "StartIndex" to "0",
+                "Limit" to "1",
+                "SortBy" to "SortName",
+                "SortOrder" to "Ascending"
+            )
+        )
+        val items = json.optJSONArray("Items") ?: return null
+        Log.d(
+            TAG,
+            "fetchFirstVideoInFolder folderId=$folderId items=${items.length()} types=${items.typeSummary()}"
+        )
+        return items.optJSONObject(0)?.toMediaItem(session)
     }
 
     /**
@@ -334,6 +395,15 @@ object EmbyHomeClient {
     /** 对字符串进行 URL 编码 */
     private fun encode(value: String): String {
         return URLEncoder.encode(value, Charsets.UTF_8.name())
+    }
+
+    private fun JSONArray.typeSummary(): String {
+        val counts = linkedMapOf<String, Int>()
+        for (index in 0 until length()) {
+            val type = optJSONObject(index)?.optString("Type").orEmpty().ifBlank { "Unknown" }
+            counts[type] = (counts[type] ?: 0) + 1
+        }
+        return counts.entries.joinToString(",") { "${it.key}:${it.value}" }
     }
 }
 

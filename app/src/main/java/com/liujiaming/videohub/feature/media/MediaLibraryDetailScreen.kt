@@ -2,6 +2,7 @@ package com.liujiaming.videohub.feature.media
 
 import android.graphics.Bitmap
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,13 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.liujiaming.videohub.feature.emby.EmbyAuthSession
-import com.liujiaming.videohub.feature.emby.EmbyHomeCache
-import com.liujiaming.videohub.feature.emby.EmbyHomeClient
 import com.liujiaming.videohub.feature.emby.EmbyImageCache
-import com.liujiaming.videohub.feature.emby.EmbyLibraryItemsCache
-import com.liujiaming.videohub.feature.emby.EmbyMediaItem
-import com.liujiaming.videohub.feature.emby.EmbySessionStore
 import com.liujiaming.videohub.ui.theme.ActiveGreen
 import com.liujiaming.videohub.ui.theme.BackgroundGray
 import com.liujiaming.videohub.ui.theme.CardBackground
@@ -81,23 +77,51 @@ fun MediaLibraryDetailScreen(
     libraryId: String,
     onBackClick: () -> Unit
 ) {
+    MediaLibraryDetailScreen(
+        initialRequest = MediaBrowseRequest(MediaSourceType.Emby, libraryId),
+        onBackClick = onBackClick
+    )
+}
+
+@Composable
+fun MediaLibraryDetailScreen(
+    initialRequest: MediaBrowseRequest,
+    onBackClick: () -> Unit
+) {
     val context = LocalContext.current
     val gridState = rememberLazyGridState()
-    var session by remember(libraryId) { mutableStateOf<EmbyAuthSession?>(null) }
-    var title by remember(libraryId) { mutableStateOf("媒体内容") }
-    var items by remember(libraryId) { mutableStateOf<List<EmbyMediaItem>>(emptyList()) }
-    var totalRecordCount by remember(libraryId) { mutableStateOf(0) }
+    var browseStack by remember(initialRequest) {
+        mutableStateOf(listOf(initialRequest))
+    }
+    val browseRequest = browseStack.last()
+    val dataSource = remember(browseRequest.sourceType) {
+        MediaBrowseDataSources.forType(browseRequest.sourceType)
+    }
+    var title by remember(browseRequest) { mutableStateOf("媒体内容") }
+    var items by remember(browseRequest) { mutableStateOf<List<MediaBrowseItem>>(emptyList()) }
+    var folderItems by remember(browseRequest) { mutableStateOf<List<MediaBrowseItem>>(emptyList()) }
+    var totalRecordCount by remember(browseRequest) { mutableStateOf(0) }
+    var folderTotalRecordCount by remember(browseRequest) { mutableStateOf(0) }
     var selectedTab by remember { mutableStateOf(MediaDetailTab.Video) }
-    var isInitialLoading by remember(libraryId) { mutableStateOf(true) }
-    var isLoadingMore by remember(libraryId) { mutableStateOf(false) }
-    var reachedEnd by remember(libraryId) { mutableStateOf(false) }
-    var errorText by remember(libraryId) { mutableStateOf<String?>(null) }
+    var isInitialLoading by remember(browseRequest) { mutableStateOf(true) }
+    var isLoadingMore by remember(browseRequest) { mutableStateOf(false) }
+    var isLoadingFolders by remember(browseRequest) { mutableStateOf(false) }
+    var reachedEnd by remember(browseRequest) { mutableStateOf(false) }
+    var reachedFolderEnd by remember(browseRequest) { mutableStateOf(false) }
+    var hasLoadedFolders by remember(browseRequest) { mutableStateOf(false) }
+    var folderNextStartIndex by remember(browseRequest) { mutableStateOf(0) }
+    var errorText by remember(browseRequest) { mutableStateOf<String?>(null) }
+    var folderErrorText by remember(browseRequest) { mutableStateOf<String?>(null) }
 
-    suspend fun loadPage(currentSession: EmbyAuthSession, startIndex: Int) {
+    BackHandler(enabled = browseStack.size > 1) {
+        browseStack = browseStack.dropLast(1)
+    }
+
+    suspend fun loadPage(startIndex: Int) {
         if (isLoadingMore || reachedEnd) {
             Log.d(
                 TAG,
-                "skip loadPage libraryId=$libraryId startIndex=$startIndex " +
+                "skip loadPage request=$browseRequest startIndex=$startIndex " +
                     "isLoadingMore=$isLoadingMore reachedEnd=$reachedEnd items=${items.size}"
             )
             return
@@ -107,21 +131,19 @@ fun MediaLibraryDetailScreen(
         errorText = null
         Log.d(
             TAG,
-            "loadPage start libraryId=$libraryId startIndex=$startIndex limit=$PAGE_SIZE cachedItems=${items.size}"
+            "loadPage start request=$browseRequest startIndex=$startIndex limit=$PAGE_SIZE cachedItems=${items.size}"
         )
         try {
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    if (libraryId.isBlank()) {
-                        error("媒体库 ID 为空，无法加载内容")
-                    }
-                    EmbyHomeClient.fetchLibraryItemsPage(
-                        session = currentSession,
-                        libraryId = libraryId,
-                        startIndex = startIndex,
-                        limit = PAGE_SIZE
-                    )
+            val result = runCatching {
+                if (browseRequest.containerId.isBlank()) {
+                    error("媒体容器 ID 为空，无法加载内容")
                 }
+                dataSource.fetchPage(
+                    context = context,
+                    request = browseRequest,
+                    startIndex = startIndex,
+                    limit = PAGE_SIZE
+                )
             }
 
             result.onSuccess { page ->
@@ -130,28 +152,26 @@ fun MediaLibraryDetailScreen(
                 totalRecordCount = page.totalRecordCount
                 reachedEnd = isPageEndReached(
                     loadedItemsCount = mergedItems.size,
-                    pageItemsCount = page.items.size,
+                    pageItemsCount = page.returnedItemCount,
                     totalRecordCount = page.totalRecordCount,
                     pageSize = PAGE_SIZE
                 )
                 Log.d(
                     TAG,
-                    "loadPage success libraryId=$libraryId startIndex=$startIndex " +
+                    "loadPage success request=$browseRequest startIndex=$startIndex " +
                         "pageItems=${page.items.size} mergedItems=${mergedItems.size} " +
+                        "returnedItems=${page.returnedItemCount} " +
                         "total=${page.totalRecordCount} reachedEnd=$reachedEnd"
                 )
 
-                withContext(Dispatchers.IO) {
-                    EmbyLibraryItemsCache.save(
-                        context = context,
-                        userId = currentSession.userId,
-                        libraryId = libraryId,
-                        items = mergedItems,
-                        totalRecordCount = page.totalRecordCount
-                    )
-                }
+                dataSource.savePage(
+                    context = context,
+                    request = browseRequest,
+                    items = mergedItems,
+                    totalRecordCount = page.totalRecordCount
+                )
             }.onFailure { error ->
-                Log.w(TAG, "loadPage failed libraryId=$libraryId startIndex=$startIndex", error)
+                Log.w(TAG, "loadPage failed request=$browseRequest startIndex=$startIndex", error)
                 errorText = error.message ?: "加载媒体库内容失败"
             }
         } finally {
@@ -160,7 +180,70 @@ fun MediaLibraryDetailScreen(
         }
     }
 
-    LaunchedEffect(libraryId, isInitialLoading) {
+    suspend fun loadFolderPage(startIndex: Int) {
+        if (isLoadingFolders || reachedFolderEnd) {
+            Log.d(
+                TAG,
+                "skip loadFolderPage request=$browseRequest startIndex=$startIndex " +
+                    "isLoadingFolders=$isLoadingFolders reachedFolderEnd=$reachedFolderEnd folders=${folderItems.size}"
+            )
+            return
+        }
+
+        isLoadingFolders = true
+        folderErrorText = null
+        hasLoadedFolders = true
+        Log.d(
+            TAG,
+            "loadFolderPage start request=$browseRequest startIndex=$startIndex limit=$PAGE_SIZE cachedFolders=${folderItems.size}"
+        )
+        var continueScanning = false
+        try {
+            val result = runCatching {
+                if (browseRequest.containerId.isBlank()) {
+                    error("媒体容器 ID 为空，无法加载文件夹")
+                }
+                dataSource.fetchFolderPage(
+                    context = context,
+                    request = browseRequest,
+                    startIndex = startIndex,
+                    limit = PAGE_SIZE
+                )
+            }
+
+            result.onSuccess { page ->
+                val mergedItems = mergeById(folderItems, page.items)
+                val nextStartIndex = startIndex + page.returnedItemCount
+                folderItems = mergedItems
+                folderNextStartIndex = nextStartIndex
+                folderTotalRecordCount = page.totalRecordCount
+                reachedFolderEnd = isPageEndReached(
+                    loadedItemsCount = nextStartIndex,
+                    pageItemsCount = page.returnedItemCount,
+                    totalRecordCount = page.totalRecordCount,
+                    pageSize = PAGE_SIZE
+                )
+                Log.d(
+                    TAG,
+                    "loadFolderPage success request=$browseRequest startIndex=$startIndex " +
+                        "folderItems=${page.items.size} mergedFolders=${mergedItems.size} " +
+                        "returnedItems=${page.returnedItemCount} total=${page.totalRecordCount} " +
+                        "nextStartIndex=$nextStartIndex reachedFolderEnd=$reachedFolderEnd"
+                )
+                continueScanning = mergedItems.isEmpty() && !reachedFolderEnd
+            }.onFailure { error ->
+                Log.w(TAG, "loadFolderPage failed request=$browseRequest startIndex=$startIndex", error)
+                folderErrorText = error.message ?: "加载文件夹失败"
+            }
+        } finally {
+            isLoadingFolders = false
+        }
+        if (continueScanning) {
+            loadFolderPage(startIndex = folderNextStartIndex)
+        }
+    }
+
+    LaunchedEffect(browseRequest, isInitialLoading) {
         if (isInitialLoading) {
             delay(INITIAL_LOADING_TIMEOUT_MS)
             if (isInitialLoading) {
@@ -171,82 +254,94 @@ fun MediaLibraryDetailScreen(
         }
     }
 
-    LaunchedEffect(libraryId) {
-        val loadedSession = EmbySessionStore.load(context)
-        if (loadedSession == null) {
-            errorText = "请先登录媒体服务器"
+    LaunchedEffect(browseRequest) {
+        val seedResult = runCatching {
+            dataSource.loadSeed(context, browseRequest)
+        }
+        seedResult.onSuccess { seed ->
+            title = seed.title
+            items = seed.items
+            totalRecordCount = seed.totalRecordCount
+            reachedEnd = seed.isFromDetailCache &&
+                seed.items.size >= PAGE_SIZE &&
+                seed.totalRecordCount > 0 &&
+                seed.items.size >= seed.totalRecordCount
+            isInitialLoading = seed.items.isEmpty()
+            Log.d(
+                TAG,
+                "seed request=$browseRequest source=${if (seed.isFromDetailCache) "detailCache" else "homeCache"} " +
+                    "seedItems=${seed.items.size} total=${seed.totalRecordCount} reachedEnd=$reachedEnd"
+            )
+
+            if (seed.items.isEmpty()) {
+                loadPage(startIndex = 0)
+            } else if (!reachedEnd && seed.items.size < PAGE_SIZE) {
+                loadPage(startIndex = seed.items.size)
+            }
+        }.onFailure { error ->
+            Log.w(TAG, "seed failed request=$browseRequest", error)
+            errorText = error.message ?: "加载媒体内容失败"
             isInitialLoading = false
-            return@LaunchedEffect
-        }
-        session = loadedSession
-
-        val cachedHome = withContext(Dispatchers.IO) {
-            EmbyHomeCache.load(context, loadedSession.userId)?.home
-        }
-        val librarySummary = cachedHome?.libraries?.firstOrNull { it.id == libraryId }
-        val homeSection = cachedHome?.librarySections?.firstOrNull { it.libraryId == libraryId }
-        title = librarySummary?.name ?: homeSection?.title ?: "媒体内容"
-
-        val cachedPage = withContext(Dispatchers.IO) {
-            EmbyLibraryItemsCache.load(context, loadedSession.userId, libraryId)
-        }
-        val hasCachedPage = cachedPage?.items?.isNotEmpty() == true
-        val seedItems = cachedPage?.items?.takeIf { it.isNotEmpty() } ?: homeSection?.items.orEmpty()
-        items = seedItems
-        totalRecordCount = cachedPage?.totalRecordCount?.takeIf { it > 0 }
-            ?: librarySummary?.itemCount
-            ?: seedItems.size
-        reachedEnd = hasCachedPage &&
-            seedItems.size >= PAGE_SIZE &&
-            totalRecordCount > 0 &&
-            seedItems.size >= totalRecordCount
-        isInitialLoading = seedItems.isEmpty()
-        Log.d(
-            TAG,
-            "seed libraryId=$libraryId source=${if (hasCachedPage) "detailCache" else "homeCache"} " +
-                "seedItems=${seedItems.size} total=$totalRecordCount reachedEnd=$reachedEnd " +
-                "hasCachedPage=$hasCachedPage"
-        )
-
-        if (seedItems.isEmpty()) {
-            loadPage(currentSession = loadedSession, startIndex = 0)
-        } else if (!reachedEnd && seedItems.size < PAGE_SIZE) {
-            loadPage(currentSession = loadedSession, startIndex = seedItems.size)
         }
     }
 
     val visibleItems = when (selectedTab) {
-        MediaDetailTab.Video -> items.filterNot { it.isFolderItem() }
-        MediaDetailTab.Folder -> items.filter { it.isFolderItem() }
+        MediaDetailTab.Video -> items.filterNot { it.isFolder }
+        MediaDetailTab.Folder -> folderItems
+    }
+    val activeLoading = when (selectedTab) {
+        MediaDetailTab.Video -> isInitialLoading
+        MediaDetailTab.Folder -> isLoadingFolders && folderItems.isEmpty()
+    }
+    val activeLoadingMore = when (selectedTab) {
+        MediaDetailTab.Video -> isLoadingMore
+        MediaDetailTab.Folder -> isLoadingFolders
+    }
+    val activeReachedEnd = when (selectedTab) {
+        MediaDetailTab.Video -> reachedEnd
+        MediaDetailTab.Folder -> reachedFolderEnd
+    }
+    val activeErrorText = when (selectedTab) {
+        MediaDetailTab.Video -> errorText
+        MediaDetailTab.Folder -> folderErrorText
     }
 
-    LaunchedEffect(libraryId, selectedTab, session) {
+    LaunchedEffect(browseRequest, selectedTab) {
+        if (selectedTab == MediaDetailTab.Folder && !hasLoadedFolders) {
+            loadFolderPage(startIndex = 0)
+        }
+    }
+
+    LaunchedEffect(browseRequest, selectedTab) {
         snapshotFlow {
-            val currentItems = items
+            val currentItems = if (selectedTab == MediaDetailTab.Folder) folderItems else items
             val visibleCount = when (selectedTab) {
-                MediaDetailTab.Video -> currentItems.count { !it.isFolderItem() }
-                MediaDetailTab.Folder -> currentItems.count { it.isFolderItem() }
+                MediaDetailTab.Video -> currentItems.count { !it.isFolder }
+                MediaDetailTab.Folder -> currentItems.size
             }
             val lastVisibleIndex = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
             val closeToEnd = lastVisibleIndex >= visibleCount - LOAD_MORE_THRESHOLD
             LoadMoreSnapshot(
-                shouldLoadMore = closeToEnd && currentItems.isNotEmpty() && !isLoadingMore && !reachedEnd,
+                shouldLoadMore = closeToEnd && currentItems.isNotEmpty() && !activeLoadingMore && !activeReachedEnd,
                 visibleCount = visibleCount,
                 itemsCount = currentItems.size
             )
         }
             .distinctUntilChanged()
             .collect { snapshot ->
-                val currentSession = session
                 Log.d(
                     TAG,
-                    "loadMoreTrigger libraryId=$libraryId selectedTab=$selectedTab " +
+                    "loadMoreTrigger request=$browseRequest selectedTab=$selectedTab " +
                         "shouldLoadMore=${snapshot.shouldLoadMore} " +
                         "visible=${snapshot.visibleCount} items=${snapshot.itemsCount} " +
-                        "isLoadingMore=$isLoadingMore reachedEnd=$reachedEnd"
+                        "isLoadingMore=$activeLoadingMore reachedEnd=$activeReachedEnd"
                 )
-                if (snapshot.shouldLoadMore && currentSession != null) {
-                    loadPage(currentSession = currentSession, startIndex = items.size)
+                if (snapshot.shouldLoadMore) {
+                    if (selectedTab == MediaDetailTab.Folder) {
+                        loadFolderPage(startIndex = folderNextStartIndex)
+                    } else {
+                        loadPage(startIndex = items.size)
+                    }
                 }
             }
     }
@@ -259,7 +354,13 @@ fun MediaLibraryDetailScreen(
     ) {
         MediaDetailTopBar(
             title = title,
-            onBackClick = onBackClick
+            onBackClick = {
+                if (browseStack.size > 1) {
+                    browseStack = browseStack.dropLast(1)
+                } else {
+                    onBackClick()
+                }
+            }
         )
 
         MediaDetailTabs(
@@ -268,17 +369,30 @@ fun MediaLibraryDetailScreen(
         )
 
         when {
-            isInitialLoading -> LoadingBox(text = "加载中...")
-            visibleItems.isEmpty() && errorText != null -> EmptyTextBox(errorText.orEmpty())
+            activeLoading -> LoadingBox(text = "加载中...")
+            visibleItems.isEmpty() && activeErrorText != null -> EmptyTextBox(activeErrorText.orEmpty())
             visibleItems.isEmpty() -> EmptyTextBox(
-                text = if (selectedTab == MediaDetailTab.Video) "暂无视频" else "暂无文件夹"
+                text = when {
+                    selectedTab == MediaDetailTab.Video -> "暂无视频"
+                    browseRequest.folderContentMode -> "暂无内容"
+                    else -> "暂无文件夹"
+                }
             )
             else -> MediaDetailGrid(
                 items = visibleItems,
-                isLoadingMore = isLoadingMore,
-                reachedEnd = reachedEnd,
-                errorText = errorText,
-                gridState = gridState
+                isLoadingMore = activeLoadingMore,
+                reachedEnd = activeReachedEnd,
+                errorText = activeErrorText,
+                gridState = gridState,
+                onFolderClick = { folder ->
+                    browseStack = browseStack + MediaBrowseRequest(
+                        sourceType = browseRequest.sourceType,
+                        containerId = folder.id,
+                        title = folder.name,
+                        recursive = true,
+                        folderContentMode = true
+                    )
+                }
             )
         }
     }
@@ -286,11 +400,12 @@ fun MediaLibraryDetailScreen(
 
 @Composable
 private fun MediaDetailGrid(
-    items: List<EmbyMediaItem>,
+    items: List<MediaBrowseItem>,
     isLoadingMore: Boolean,
     reachedEnd: Boolean,
     errorText: String?,
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
+    onFolderClick: (MediaBrowseItem) -> Unit
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
@@ -306,7 +421,10 @@ private fun MediaDetailGrid(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(items, key = { it.id.ifBlank { it.name } }) { item ->
-            MediaDetailGridItem(item)
+            MediaDetailGridItem(
+                item = item,
+                onFolderClick = onFolderClick
+            )
         }
 
         if (isLoadingMore || errorText != null || reachedEnd) {
@@ -482,8 +600,17 @@ private fun MediaDetailTabButton(
 }
 
 @Composable
-private fun MediaDetailGridItem(item: EmbyMediaItem) {
-    Column {
+private fun MediaDetailGridItem(
+    item: MediaBrowseItem,
+    onFolderClick: (MediaBrowseItem) -> Unit
+) {
+    Column(
+        modifier = if (item.isFolder) {
+            Modifier.clickable { onFolderClick(item) }
+        } else {
+            Modifier
+        }
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -496,7 +623,25 @@ private fun MediaDetailGridItem(item: EmbyMediaItem) {
                 modifier = Modifier.fillMaxSize()
             )
 
-            if (item.played) {
+            if (item.isFolder) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+            }
+
+            if (!item.isFolder && item.played) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -515,7 +660,7 @@ private fun MediaDetailGridItem(item: EmbyMediaItem) {
                 }
             }
 
-            if (item.playbackProgress > 0f) {
+            if (!item.isFolder && item.playbackProgress > 0f) {
                 LinearProgressIndicator(
                     progress = item.playbackProgress,
                     modifier = Modifier
@@ -590,16 +735,11 @@ private data class LoadMoreSnapshot(
     val itemsCount: Int
 )
 
-private fun EmbyMediaItem.isFolderItem(): Boolean {
-    return type.equals("Folder", ignoreCase = true) ||
-        type.equals("CollectionFolder", ignoreCase = true)
-}
-
 private fun mergeById(
-    currentItems: List<EmbyMediaItem>,
-    newItems: List<EmbyMediaItem>
-): List<EmbyMediaItem> {
-    val merged = LinkedHashMap<String, EmbyMediaItem>()
+    currentItems: List<MediaBrowseItem>,
+    newItems: List<MediaBrowseItem>
+): List<MediaBrowseItem> {
+    val merged = LinkedHashMap<String, MediaBrowseItem>()
     (currentItems + newItems).forEachIndexed { index, item ->
         val key = item.id.ifBlank { "${item.name}_$index" }
         merged[key] = item

@@ -202,7 +202,10 @@ private fun ConnectedMediaLibraryContent(
         }
 
         SectionTitle("我的媒体")
-        HorizontalLibraryRow(home.libraries)
+        HorizontalLibraryRow(
+            libraries = home.libraries,
+            onLibraryClick = onLibraryViewAllClick
+        )
 
         SectionTitle("继续观看")
         HorizontalMediaRow(home.resumeItems, emptyText = "暂无继续观看")
@@ -301,7 +304,10 @@ private fun LibrarySectionHeader(title: String, onViewAllClick: () -> Unit) {
 }
 
 @Composable
-private fun HorizontalLibraryRow(libraries: List<EmbyLibrarySummary>) {
+private fun HorizontalLibraryRow(
+    libraries: List<EmbyLibrarySummary>,
+    onLibraryClick: (String) -> Unit
+) {
     if (libraries.isEmpty()) {
         EmptySectionCard("暂无媒体库，请在设置-资源中刷新在线影视数据")
         return
@@ -309,14 +315,23 @@ private fun HorizontalLibraryRow(libraries: List<EmbyLibrarySummary>) {
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(libraries, key = { it.id.ifBlank { it.name } }) { library ->
-            LibraryCard(library)
+            LibraryCard(
+                library = library,
+                onClick = { onLibraryClick(library.id) }
+            )
         }
     }
 }
 
 @Composable
-private fun LibraryCard(library: EmbyLibrarySummary) {
-    MediaCardShell(width = 156.dp) {
+private fun LibraryCard(
+    library: EmbyLibrarySummary,
+    onClick: () -> Unit
+) {
+    MediaCardShell(
+        modifier = Modifier.clickable(onClick = onClick),
+        width = 156.dp
+    ) {
         PosterFrame(height = 88.dp, imageUrl = library.imageUrl, showPlay = false) {
             LibraryPlaceholder()
         }

@@ -1,4 +1,4 @@
-package com.liujiaming.videohub.feature.media
+﻿package com.liujiaming.videohub.feature.media
 
 import android.app.Activity
 import android.util.Log
@@ -57,13 +57,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.liujiaming.videohub.feature.bilibili.BilibiliPlaybackSource
+import com.liujiaming.videohub.feature.bilibili.BilibiliClient
+import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
 import com.liujiaming.videohub.feature.emby.EmbyHomeClient
 import com.liujiaming.videohub.feature.emby.EmbySessionStore
 import com.liujiaming.videohub.feature.settings.SettingsMemory
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 private const val PLAYER_TAG = "MediaPlayerScreen"
 private val PlayerOverlay = Color(0x80000000)
@@ -94,6 +102,7 @@ fun MediaPlayerScreen(
     val view = LocalView.current
     var controlsVisible by remember { mutableStateOf(true) }
     var playerError by remember(item.id) { mutableStateOf<String?>(null) }
+    var playerDebugText by remember(item.id) { mutableStateOf("") }
     var isPlaying by remember { mutableStateOf(false) }
     var durationMs by remember { mutableStateOf(0L) }
     var positionMs by remember { mutableStateOf(0L) }
@@ -101,9 +110,20 @@ fun MediaPlayerScreen(
     var isSeeking by remember { mutableStateOf(false) }
 
     val player = remember(item.id) {
-        ExoPlayer.Builder(context).build().apply {
-            playWhenReady = true
+        val httpFactory = DefaultHttpDataSource.Factory().apply {
+            setDefaultRequestProperties(
+                mapOf(
+                    "User-Agent" to "Mozilla/5.0 VideoHub Android",
+                    "Referer" to "https://www.bilibili.com"
+                )
+            )
         }
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+            .build()
+            .apply {
+                playWhenReady = true
+            }
     }
 
     DisposableEffect(player) {
@@ -147,22 +167,61 @@ fun MediaPlayerScreen(
         }
     }
 
-    LaunchedEffect(item.id) {
-        runCatching {
-            val session = EmbySessionStore.load(context) ?: error("请先登录媒体服务器")
-            EmbyHomeClient.playbackUrl(session, item.id)
-        }.onSuccess { url ->
-            Log.d(PLAYER_TAG, "Start playback itemId=${item.id} title=${item.name}")
+    LaunchedEffect(item.id, item.sourceType) {
+        playerDebugText = "准备播放 source=${item.sourceType} id=${item.id}"
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                when (item.sourceType) {
+                    MediaSourceType.Bilibili -> {
+                        val session = BilibiliSessionStore.load(context) ?: error("请先扫码登录 Bilibili")
+                        val source = BilibiliClient.fetchPlaybackSource(session, item.id)
+                        BilibiliPlaybackTarget(
+                            source = source,
+                            debugText = "Bilibili session mid=${session.mid} cookieLength=${session.cookie.length} bvid=${item.id}\n" +
+                                "Bilibili source host=${source.url.hostOrPrefix()} headers=${source.headers.keys.joinToString(",")}"
+                        )
+                    }
+                    else -> {
+                        val session = EmbySessionStore.load(context) ?: error("请先登录媒体服务器")
+                        DirectPlaybackTarget(
+                            url = EmbyHomeClient.playbackUrl(session, item.id),
+                            debugText = "Emby session server=${session.serverName} itemId=${item.id}"
+                        )
+                    }
+                }
+            }
+        }
+        result.onSuccess { target ->
+            Log.d(PLAYER_TAG, "Start playback itemId=${item.id} title=${item.name} sourceType=${item.sourceType}")
             playerError = null
-            player.setMediaItem(MediaItem.fromUri(url))
+            when (target) {
+                is BilibiliPlaybackTarget -> {
+                    playerDebugText = target.debugText
+                    val httpFactory = DefaultHttpDataSource.Factory().apply {
+                        setDefaultRequestProperties(target.source.headers)
+                    }
+                    val mediaSource = ProgressiveMediaSource.Factory(httpFactory)
+                        .createMediaSource(MediaItem.fromUri(target.source.url))
+                    player.setMediaSource(mediaSource)
+                }
+                is DirectPlaybackTarget -> {
+                    playerDebugText = target.debugText
+                    player.setMediaItem(MediaItem.fromUri(target.url))
+                }
+            }
             player.prepare()
             player.play()
         }.onFailure { error ->
-            Log.e(PLAYER_TAG, "Prepare playback failed itemId=${item.id}: ${error.message}", error)
-            playerError = error.message ?: "播放地址生成失败"
+            val detail = buildPlaybackErrorMessage(error)
+            Log.e(PLAYER_TAG, "Prepare playback failed itemId=${item.id} sourceType=${item.sourceType}: $detail", error)
+            playerDebugText = "$playerDebugText\n失败: $detail"
+            playerError = if (item.sourceType == MediaSourceType.Bilibili) {
+                "Bilibili 播放地址获取失败\n$detail"
+            } else {
+                error.message ?: "播放地址生成失败"
+            }
         }
     }
-
     LaunchedEffect(player, isSeeking) {
         while (true) {
             durationMs = player.duration.takeIf { it > 0 } ?: durationMs
@@ -222,16 +281,35 @@ fun MediaPlayerScreen(
         }
 
         playerError?.let { message ->
-            Text(
-                text = message,
-                color = PlayerMutedText,
-                fontSize = 14.sp,
-                letterSpacing = 0.sp,
+            Column(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp)
                     .background(PlayerOverlay)
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-            )
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = message,
+                    color = PlayerText,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 19.sp,
+                    letterSpacing = 0.sp
+                )
+                if (item.sourceType == MediaSourceType.Bilibili && playerDebugText.isNotBlank()) {
+                    Text(
+                        text = playerDebugText,
+                        color = PlayerMutedText,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp,
+                        maxLines = 8,
+                        overflow = TextOverflow.Ellipsis,
+                        letterSpacing = 0.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -402,4 +480,36 @@ private fun formatPlayerTime(timeMs: Long): String {
     } else {
         "%02d:%02d".format(minutes, seconds)
     }
+}
+
+private sealed interface PlaybackTarget
+
+private data class DirectPlaybackTarget(
+    val url: String,
+    val debugText: String
+) : PlaybackTarget
+
+private data class BilibiliPlaybackTarget(
+    val source: BilibiliPlaybackSource,
+    val debugText: String
+) : PlaybackTarget
+
+private fun buildPlaybackErrorMessage(error: Throwable): String {
+    val parts = buildList {
+        add(error::class.java.simpleName.ifBlank { "Throwable" })
+        error.message?.takeIf { it.isNotBlank() }?.let { add(it) }
+        error.cause?.let { cause ->
+            add("cause=${cause::class.java.simpleName}:${cause.message.orEmpty()}")
+        }
+    }
+    return parts.joinToString(" | ").ifBlank {
+        error.stackTraceToString().lineSequence().firstOrNull().orEmpty().ifBlank {
+            "unknown playback error"
+        }
+    }
+}
+
+private fun String.hostOrPrefix(): String {
+    return runCatching { java.net.URL(this).host }.getOrNull()
+        ?: take(64)
 }

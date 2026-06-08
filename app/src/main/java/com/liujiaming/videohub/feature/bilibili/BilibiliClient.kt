@@ -1,4 +1,4 @@
-package com.liujiaming.videohub.feature.bilibili
+﻿package com.liujiaming.videohub.feature.bilibili
 
 import android.content.Context
 import android.util.Log
@@ -14,11 +14,22 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URLEncoder
 import java.net.URL
+import java.security.MessageDigest
 
 object BilibiliClient {
     private const val TAG = "BilibiliClient"
     private const val BASE_URL = "https://api.bilibili.com"
     private const val PASSPORT_URL = "https://passport.bilibili.com"
+    private val WBI_MIXIN_KEY_ENC_TAB = intArrayOf(
+        46, 47, 18, 2, 53, 8, 23, 32,
+        15, 50, 10, 31, 58, 3, 45, 35,
+        27, 43, 5, 49, 33, 9, 42, 19,
+        29, 28, 14, 39, 12, 38, 41, 13,
+        37, 48, 7, 16, 24, 55, 40, 61,
+        26, 17, 0, 1, 60, 51, 30, 4,
+        22, 25, 54, 21, 56, 59, 6, 63,
+        57, 62, 11, 36, 20, 34, 44, 52
+    )
 
     fun generateQrCode(): BilibiliQrCode {
         val json = getJsonObject("$PASSPORT_URL/x/passport-login/web/qrcode/generate")
@@ -141,8 +152,13 @@ object BilibiliClient {
             "$BASE_URL/x/web-interface/view?bvid=${encode(bvid)}",
             cookie = session.cookie
         )
+        val apiCode = json.optInt("code", -1)
+        if (apiCode != 0) {
+            error("Bilibili 视频详情接口返回错误 code=$apiCode message=${json.optString("message")}")
+        }
         val data = json.optJSONObject("data") ?: JSONObject()
         val owner = data.optJSONObject("owner")
+        val firstPage = data.optJSONArray("pages")?.optJSONObject(0)
         return BilibiliVideoDetail(
             bvid = data.optString("bvid", bvid),
             title = data.optString("title"),
@@ -150,10 +166,160 @@ object BilibiliClient {
             cover = data.optString("pic"),
             authorName = owner?.optString("name").orEmpty(),
             authorFace = owner?.optString("face").orEmpty(),
-            durationSeconds = data.optLong("duration", 0L)
+            durationSeconds = data.optLong("duration", 0L),
+            cid = firstPage?.optLong("cid", 0L)?.takeIf { it > 0L }
+                ?: data.optLong("cid", 0L)
         )
     }
 
+    fun fetchPlaybackSource(session: BilibiliSession, bvid: String): BilibiliPlaybackSource {
+        val detail = fetchVideoDetail(session, bvid)
+        val cid = detail.cid
+        if (cid <= 0L) error("无法获取视频分片 ID")
+
+        val headers = playbackHeaders(session, bvid)
+        val attempts = listOf(
+            runCatching {
+                val signedUrl = buildWbiPlayUrl(
+                    session = session,
+                    bvid = bvid,
+                    cid = cid,
+                    qn = "64",
+                    fnval = "0",
+                    platform = "html5"
+                )
+                parsePlaybackJson(
+                    json = getJsonObject(signedUrl, cookie = session.cookie),
+                    headers = headers,
+                    label = "wbi-html5"
+                )
+            },
+            runCatching {
+                val signedUrl = buildWbiPlayUrl(
+                    session = session,
+                    bvid = bvid,
+                    cid = cid,
+                    qn = "64",
+                    fnval = "1",
+                    platform = "pc"
+                )
+                parsePlaybackJson(
+                    json = getJsonObject(signedUrl, cookie = session.cookie),
+                    headers = headers,
+                    label = "wbi-pc"
+                )
+            },
+            runCatching {
+                parsePlaybackJson(
+                    json = getJsonObject(
+                        "$BASE_URL/x/player/playurl?bvid=${encode(bvid)}&cid=$cid&qn=64&platform=html5&fnval=0&fnver=0&fourk=0",
+                        cookie = session.cookie
+                    ),
+                    headers = headers,
+                    label = "legacy-html5"
+                )
+            }
+        )
+
+        attempts.firstOrNull { it.isSuccess }?.getOrNull()?.let { return it }
+        attempts.forEachIndexed { index, attempt ->
+            attempt.exceptionOrNull()?.let { error ->
+                Log.w(TAG, "playurl attempt#$index failed bvid=$bvid cid=$cid: ${error.message}")
+            }
+        }
+        val message = attempts.mapIndexedNotNull { index, attempt ->
+            attempt.exceptionOrNull()?.let { error ->
+                "#$index ${error.message ?: error::class.java.simpleName}"
+            }
+        }.joinToString(" | ")
+        error(message.ifBlank { "Bilibili 播放地址获取失败" })
+    }
+
+    fun fetchPlaybackUrl(session: BilibiliSession, bvid: String): String {
+        return fetchPlaybackSource(session, bvid).url
+    }
+
+    private fun parsePlaybackJson(
+        json: JSONObject,
+        headers: Map<String, String>,
+        label: String
+    ): BilibiliPlaybackSource {
+        val apiCode = json.optInt("code", -1)
+        if (apiCode != 0) {
+            error("$label 返回错误 code=$apiCode message=${json.optString("message")}")
+        }
+        val data = json.optJSONObject("data")
+            ?: error("$label 响应缺少 data")
+        val durl = data.optJSONArray("durl")
+        val firstUrl = durl?.optJSONObject(0)?.optString("url")
+            ?: durl?.optJSONObject(0)?.optJSONArray("backup_url")?.optString(0)
+        if (!firstUrl.isNullOrBlank()) {
+            Log.d(TAG, "playurl success label=$label type=durl quality=${data.optInt("quality")} format=${data.optString("format")}")
+            return BilibiliPlaybackSource(url = firstUrl, headers = headers)
+        }
+
+        val dashVideo = data.optJSONObject("dash")?.optJSONArray("video")
+        val dashUrl = dashVideo?.optJSONObject(0)?.optString("baseUrl")
+            ?: dashVideo?.optJSONObject(0)?.optString("base_url")
+        if (!dashUrl.isNullOrBlank()) {
+            Log.d(TAG, "playurl success label=$label type=dash quality=${data.optInt("quality")} format=${data.optString("format")}")
+            return BilibiliPlaybackSource(url = dashUrl, headers = headers)
+        }
+        error("$label 无法解析视频流地址 quality=${data.optInt("quality")} format=${data.optString("format")}")
+    }
+
+    private fun buildWbiPlayUrl(
+        session: BilibiliSession,
+        bvid: String,
+        cid: Long,
+        qn: String,
+        fnval: String,
+        platform: String
+    ): String {
+        val params = linkedMapOf(
+            "bvid" to bvid,
+            "cid" to cid.toString(),
+            "qn" to qn,
+            "platform" to platform,
+            "fnval" to fnval,
+            "fnver" to "0",
+            "fourk" to "0"
+        )
+        val signed = signWbiParams(session, params)
+        return "$BASE_URL/x/player/wbi/playurl?" + signed.entries.joinToString("&") { (key, value) ->
+            "${encode(key)}=${encode(value)}"
+        }
+    }
+
+    private fun signWbiParams(
+        session: BilibiliSession,
+        params: Map<String, String>
+    ): Map<String, String> {
+        val nav = getJsonObject("$BASE_URL/x/web-interface/nav", cookie = session.cookie)
+        val wbiImg = nav.optJSONObject("data")?.optJSONObject("wbi_img")
+            ?: error("无法获取 Bilibili WBI 签名图片")
+        val imgKey = wbiImg.optString("img_url").substringAfterLast('/').substringBefore('.')
+        val subKey = wbiImg.optString("sub_url").substringAfterLast('/').substringBefore('.')
+        val mixinKey = WBI_MIXIN_KEY_ENC_TAB.joinToString("") { index ->
+            (imgKey + subKey).getOrNull(index)?.toString().orEmpty()
+        }.take(32)
+        val signed = params.toMutableMap()
+        signed["wts"] = (System.currentTimeMillis() / 1000L).toString()
+        val query = signed.toSortedMap().entries.joinToString("&") { (key, value) ->
+            "${encode(key)}=${encode(value.filterWbiValue())}"
+        }
+        signed["w_rid"] = md5(query + mixinKey)
+        return signed.toSortedMap()
+    }
+
+    private fun playbackHeaders(session: BilibiliSession, bvid: String): Map<String, String> {
+        return mapOf(
+            "User-Agent" to "Mozilla/5.0 VideoHub Android",
+            "Referer" to "https://www.bilibili.com/video/$bvid",
+            "Origin" to "https://www.bilibili.com",
+            "Cookie" to session.cookie
+        )
+    }
     private fun JSONObject.toMediaItem(): EmbyMediaItem? {
         val bvid = optString("bvid").ifBlank { optString("id") }
         if (bvid.isBlank()) return null
@@ -208,6 +374,15 @@ object BilibiliClient {
 
     private fun encode(value: String): String {
         return URLEncoder.encode(value, Charsets.UTF_8.name())
+    }
+
+    private fun String.filterWbiValue(): String {
+        return filterNot { it in "!'()*" }
+    }
+
+    private fun md5(value: String): String {
+        val digest = MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }
 
@@ -272,7 +447,13 @@ data class BilibiliVideoDetail(
     val cover: String,
     val authorName: String,
     val authorFace: String,
-    val durationSeconds: Long
+    val durationSeconds: Long,
+    val cid: Long = 0L
+)
+
+data class BilibiliPlaybackSource(
+    val url: String,
+    val headers: Map<String, String>
 )
 
 private data class BilibiliHttpResponse(

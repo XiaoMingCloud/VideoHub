@@ -1,6 +1,8 @@
 package com.liujiaming.videohub.feature.filesource
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,146 +15,242 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.R
 import com.liujiaming.videohub.ui.components.BottomNavItem
 import com.liujiaming.videohub.ui.components.FloatingBottomNav
 import com.liujiaming.videohub.ui.theme.ActiveGreen
-import com.liujiaming.videohub.ui.theme.PageBackground
+import com.liujiaming.videohub.ui.theme.BackgroundGray
+import com.liujiaming.videohub.ui.theme.CardBackground
+import com.liujiaming.videohub.ui.theme.DividerGray
 import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 
-/**
- * 文件源主页面。
- * 当前展示空状态界面，提示用户添加文件源。
- * 包含顶部标题栏（带使用教程入口）和底部悬浮导航栏。
- *
- * @param onAddFileSourceClick 点击"添加文件源"按钮的回调
- * @param onTutorialClick 点击"使用教程"的回调
- * @param onMediaClick 底部导航"媒体库"点击回调
- * @param onServerClick 底部导航"影视服务器"点击回调
- * @param onSettingsClick 底部导航"设置"点击回调
- */
 @Composable
 fun FileSourceScreen(
     onAddFileSourceClick: () -> Unit,
     onTutorialClick: () -> Unit,
+    onLocalSourceClick: (LocalFileSource) -> Unit,
     onMediaClick: () -> Unit,
     onServerClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val sources = remember { LocalFileSourceStore.load(context) }
+
     Scaffold(
-        containerColor = PageBackground,
+        containerColor = BackgroundGray,
         bottomBar = {
-            // 底部悬浮导航栏，当前高亮"文件源"项
             FloatingBottomNav(
                 activeItem = BottomNavItem.File,
                 onMediaClick = onMediaClick,
-                onFileClick = {},       // 当前已在文件源页面，无需跳转
+                onFileClick = {},
                 onServerClick = onServerClick,
                 onSettingsClick = onSettingsClick
             )
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .statusBarsPadding()
         ) {
-            // 顶部标题栏，包含"使用教程"和"更多"按钮
             FileSourceTopBar(
                 onTutorialClick = onTutorialClick,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
+                onAddClick = onAddFileSourceClick
             )
 
-            // 空状态内容：Logo + 提示文字 + 添加按钮
-            EmptyFileSourceContent(
-                onAddClick = onAddFileSourceClick,
-                modifier = Modifier.align(Alignment.Center)
-            )
+            if (sources.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    EmptyFileSourceContent(
+                        onAddClick = onAddFileSourceClick,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+            } else {
+                LocalSourceList(
+                    sources = sources,
+                    onSourceClick = onLocalSourceClick,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }
 
-/**
- * 文件源页面顶部栏。
- * 左侧显示"文件源"大标题，右侧显示"使用教程"文本按钮和"更多"图标按钮。
- *
- * @param onTutorialClick 点击"使用教程"的回调
- * @param modifier 布局修饰符
- */
 @Composable
 private fun FileSourceTopBar(
     onTutorialClick: () -> Unit,
+    onAddClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 14.dp, top = 4.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "文件源",
+                color = PrimaryText,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.sp
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = onTutorialClick,
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text(
+                        text = "使用教程",
+                        color = PrimaryText,
+                        fontSize = 14.sp,
+                        letterSpacing = 0.sp
+                    )
+                }
+
+                IconButton(
+                    onClick = onAddClick,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "添加文件源",
+                        tint = PrimaryText
+                    )
+                }
+
+                IconButton(
+                    onClick = { },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreHoriz,
+                        contentDescription = "更多",
+                        tint = PrimaryText
+                    )
+                }
+            }
+        }
+        Divider(color = DividerGray, thickness = 0.5.dp)
+    }
+}
+
+@Composable
+private fun LocalSourceList(
+    sources: List<LocalFileSource>,
+    onSourceClick: (LocalFileSource) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 14.15.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 16.dp,
+            bottom = 112.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 页面大标题
-        Text(
-            text = "文件源",
-            color = PrimaryText,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.sp
-        )
+        items(sources, key = { it.id }) { source ->
+            LocalSourceCard(source, onClick = { onSourceClick(source) })
+        }
+    }
+}
 
-        // 右侧操作区：使用教程 + 更多菜单
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onTutorialClick) {
-                Text(
-                    text = "使用教程",
-                    color = PrimaryText,
-                    fontSize = 14.sp,
-                    letterSpacing = 0.sp
+@Composable
+private fun LocalSourceCard(
+    source: LocalFileSource,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .background(Color(0xFFFFB300), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(25.dp)
                 )
             }
 
-            IconButton(onClick = { }) {
-                Icon(
-                    imageVector = Icons.Default.MoreHoriz,
-                    contentDescription = "更多",
-                    tint = PrimaryText
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = source.name,
+                    color = PrimaryText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = 0.sp
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "我的本地目录",
+                    color = TextGray,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    letterSpacing = 0.sp
                 )
             }
         }
     }
 }
 
-/**
- * 文件源为空时的占位内容。
- * 居中展示应用 Logo、提示文字和"添加文件源"按钮。
- *
- * @param onAddClick 点击添加按钮的回调
- * @param modifier 布局修饰符
- */
 @Composable
 private fun EmptyFileSourceContent(
     onAddClick: () -> Unit,
@@ -162,10 +260,9 @@ private fun EmptyFileSourceContent(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp)
-            .padding(bottom = 72.dp),    // 预留底部导航栏空间
+            .padding(bottom = 72.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 应用 Logo 图片，圆角 24dp 裁剪
         Image(
             painter = painterResource(id = R.drawable.logo),
             contentDescription = "VideoHub",
@@ -177,7 +274,6 @@ private fun EmptyFileSourceContent(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 主提示文字
         Text(
             text = "文件源为空",
             color = PrimaryText,
@@ -188,7 +284,6 @@ private fun EmptyFileSourceContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 副提示文字
         Text(
             text = "请添加文件源，享受您的私人影院。",
             color = TextGray,
@@ -198,7 +293,6 @@ private fun EmptyFileSourceContent(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        // 添加文件源按钮，绿色背景，圆角胶囊形状
         Button(
             onClick = onAddClick,
             modifier = Modifier

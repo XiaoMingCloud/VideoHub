@@ -1,10 +1,13 @@
 ﻿package com.liujiaming.videohub.feature.media
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +62,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liujiaming.videohub.R
 import com.liujiaming.videohub.feature.bilibili.BilibiliClient
+import com.liujiaming.videohub.feature.bilibili.BilibiliHomeCache
 import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
 import com.liujiaming.videohub.feature.emby.EmbyHomeCache
 import com.liujiaming.videohub.feature.emby.EmbyHomeDebugState
@@ -89,6 +94,10 @@ import com.liujiaming.videohub.ui.theme.PrimaryText
 import com.liujiaming.videohub.ui.theme.TextGray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
 
 private const val SHOW_EMBY_DEBUG_LOG = false
 
@@ -128,9 +137,17 @@ fun MediaLibraryScreen(
     var debugState by remember(selectedSourceType, embySession?.accessToken) {
         mutableStateOf<EmbyHomeDebugState?>(null)
     }
+    var refreshNonce by remember { mutableStateOf(0) }
+    var refreshSourceType by remember { mutableStateOf<MediaSourceType?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(selectedSourceType, embySession?.accessToken, bilibiliSession?.mid) {
-        mediaHome = null
+    LaunchedEffect(selectedSourceType, embySession?.accessToken, bilibiliSession?.mid, refreshNonce) {
+        val forceRefresh = refreshSourceType == selectedSourceType
+        if (forceRefresh) {
+            isRefreshing = true
+        } else {
+            mediaHome = null
+        }
         loadError = null
         debugState = null
 
@@ -152,16 +169,35 @@ fun MediaLibraryScreen(
             }
             MediaSourceType.Bilibili -> {
                 if (bilibiliSession == null) return@LaunchedEffect
+                val cachedHome = withContext(Dispatchers.IO) {
+                    BilibiliHomeCache.load(context, bilibiliSession.mid)
+                }
+                if (!forceRefresh && cachedHome != null && BilibiliHomeCache.isFresh(cachedHome)) {
+                    mediaHome = cachedHome.home.sanitized()
+                    isRefreshing = false
+                    return@LaunchedEffect
+                }
                 val result = withContext(Dispatchers.IO) {
-                    runCatching { BilibiliClient.fetchHome(bilibiliSession) }
+                    runCatching {
+                        BilibiliClient.fetchHome(bilibiliSession).also { home ->
+                            BilibiliHomeCache.save(context, bilibiliSession.mid, home)
+                        }
+                    }
                 }
                 result.onSuccess {
                     mediaHome = it.sanitized()
                 }.onFailure {
+                    if (cachedHome?.home != null) {
+                        mediaHome = cachedHome.home.sanitized()
+                    }
                     loadError = it.message ?: "加载 Bilibili 收藏夹失败"
                 }
             }
             else -> Unit
+        }
+        isRefreshing = false
+        if (forceRefresh) {
+            refreshSourceType = null
         }
     }
 
@@ -198,6 +234,10 @@ fun MediaLibraryScreen(
                         ?: availableSources.firstOrNull { it.type == selectedSourceType }?.name
                         ?: "媒体库",
                     sourceType = selectedSourceType,
+                    avatarImageUrl = currentSourceAvatarUrl(selectedSourceType, embySession, bilibiliSession),
+                    avatarFallbackText = currentSourceAvatarFallback(selectedSourceType, embySession, bilibiliSession),
+                    avatarFallbackColor = currentSourceAvatarColor(selectedSourceType),
+                    avatarRequestHeaders = currentSourceAvatarHeaders(selectedSourceType, embySession),
                     sourceOptions = availableSources,
                     onSourceSelected = { option ->
                         selectedSourceType = option.type
@@ -206,6 +246,13 @@ fun MediaLibraryScreen(
                     mediaHome = mediaHome,
                     errorText = loadError,
                     debugState = debugState,
+                    isRefreshing = isRefreshing && selectedSourceType == MediaSourceType.Bilibili,
+                    onManualRefresh = {
+                        if (selectedSourceType == MediaSourceType.Bilibili) {
+                            refreshSourceType = MediaSourceType.Bilibili
+                            refreshNonce++
+                        }
+                    },
                     onLibraryViewAllClick = onLibraryViewAllClick
                 )
             }
@@ -216,11 +263,17 @@ fun MediaLibraryScreen(
 private fun ConnectedMediaLibraryContent(
     sourceName: String,
     sourceType: MediaSourceType,
+    avatarImageUrl: String,
+    avatarFallbackText: String,
+    avatarFallbackColor: Color,
+    avatarRequestHeaders: Map<String, String>,
     sourceOptions: List<MediaSourceOption>,
     onSourceSelected: (MediaSourceOption) -> Unit,
     mediaHome: EmbyMediaHome?,
     errorText: String?,
     debugState: EmbyHomeDebugState?,
+    isRefreshing: Boolean,
+    onManualRefresh: () -> Unit,
     onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
 ) {
     val home = mediaHome ?: EmbyMediaHome(
@@ -232,21 +285,55 @@ private fun ConnectedMediaLibraryContent(
         librarySections = emptyList()
     )
 
+    val scrollState = rememberScrollState()
+    var pullDistance by remember { mutableStateOf(0f) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .pointerInput(sourceType, isRefreshing) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        if (sourceType == MediaSourceType.Bilibili && pullDistance > 120f && !isRefreshing) {
+                            onManualRefresh()
+                        }
+                        pullDistance = 0f
+                    },
+                    onDragCancel = { pullDistance = 0f },
+                    onVerticalDrag = { _, dragAmount ->
+                        if (scrollState.value == 0 && dragAmount > 0f) {
+                            pullDistance += dragAmount
+                        }
+                    }
+                )
+            }
+            .verticalScroll(scrollState)
             .padding(horizontal = 16.dp)
             .padding(bottom = 22.dp)
     ) {
         ConnectedTopBar(
             sourceName = sourceName,
+            avatarImageUrl = avatarImageUrl,
+            avatarFallbackText = avatarFallbackText,
+            avatarFallbackColor = avatarFallbackColor,
+            avatarRequestHeaders = avatarRequestHeaders,
             sourceOptions = sourceOptions,
-            onSourceSelected = onSourceSelected
+            onSourceSelected = onSourceSelected,
+            onManualRefresh = onManualRefresh
         )
 
         if (SHOW_EMBY_DEBUG_LOG && debugState != null) {
             EmbyDebugCard(debugState)
+        }
+
+        if (isRefreshing) {
+            Text(
+                text = "正在刷新 Bilibili 缓存...",
+                color = ActiveGreen,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+                letterSpacing = 0.sp
+            )
         }
 
         if (errorText != null) {
@@ -276,8 +363,13 @@ private fun ConnectedMediaLibraryContent(
 @Composable
 private fun ConnectedTopBar(
     sourceName: String,
+    avatarImageUrl: String,
+    avatarFallbackText: String,
+    avatarFallbackColor: Color,
+    avatarRequestHeaders: Map<String, String>,
     sourceOptions: List<MediaSourceOption>,
-    onSourceSelected: (MediaSourceOption) -> Unit
+    onSourceSelected: (MediaSourceOption) -> Unit,
+    onManualRefresh: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     Row(
@@ -292,13 +384,11 @@ private fun ConnectedTopBar(
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.logo),
-                contentDescription = "VideoHub",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
+            SourceAvatar(
+                imageUrl = avatarImageUrl,
+                fallbackText = avatarFallbackText,
+                fallbackColor = avatarFallbackColor,
+                requestHeaders = avatarRequestHeaders
             )
 
             Spacer(modifier = Modifier.width(10.dp))
@@ -334,8 +424,51 @@ private fun ConnectedTopBar(
         IconButton(onClick = { }) {
             Icon(Icons.Default.Search, contentDescription = "搜索", tint = PrimaryText)
         }
-        IconButton(onClick = { }) {
-            Icon(Icons.Default.MoreHoriz, contentDescription = "更多", tint = PrimaryText)
+        IconButton(onClick = onManualRefresh) {
+            Icon(Icons.Default.MoreHoriz, contentDescription = "刷新", tint = PrimaryText)
+        }
+    }
+}
+
+@Composable
+private fun SourceAvatar(
+    imageUrl: String,
+    fallbackText: String,
+    fallbackColor: Color,
+    requestHeaders: Map<String, String>
+) {
+    val context = LocalContext.current
+    var bitmap by remember(imageUrl) { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(imageUrl) {
+        bitmap = withContext(Dispatchers.IO) {
+            runCatching { loadSourceAvatarBitmap(context, imageUrl, requestHeaders) }.getOrNull()
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(fallbackColor),
+        contentAlignment = Alignment.Center
+    ) {
+        val currentBitmap = bitmap
+        if (currentBitmap != null) {
+            Image(
+                bitmap = currentBitmap.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Text(
+                text = fallbackText,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.sp
+            )
         }
     }
 }
@@ -927,6 +1060,103 @@ data class MediaSourceOption(
     val type: MediaSourceType,
     val name: String
 )
+
+private fun currentSourceAvatarUrl(
+    sourceType: MediaSourceType,
+    embySession: com.liujiaming.videohub.feature.emby.EmbyAuthSession?,
+    bilibiliSession: com.liujiaming.videohub.feature.bilibili.BilibiliSession?
+): String {
+    return when (sourceType) {
+        MediaSourceType.Emby -> embySession?.embyUserAvatarUrl().orEmpty()
+        MediaSourceType.Bilibili -> bilibiliSession?.face.orEmpty()
+        else -> ""
+    }
+}
+
+private fun currentSourceAvatarFallback(
+    sourceType: MediaSourceType,
+    embySession: com.liujiaming.videohub.feature.emby.EmbyAuthSession?,
+    bilibiliSession: com.liujiaming.videohub.feature.bilibili.BilibiliSession?
+): String {
+    return when (sourceType) {
+        MediaSourceType.Emby -> embySession?.username?.firstOrNull()?.uppercase() ?: "E"
+        MediaSourceType.Bilibili -> bilibiliSession?.username?.firstOrNull()?.uppercase() ?: "B"
+        else -> "V"
+    }
+}
+
+private fun currentSourceAvatarColor(sourceType: MediaSourceType): Color {
+    return when (sourceType) {
+        MediaSourceType.Emby -> Color(0xFF43A047)
+        MediaSourceType.Bilibili -> Color(0xFF00A1D6)
+        else -> ActiveGreen
+    }
+}
+
+private fun currentSourceAvatarHeaders(
+    sourceType: MediaSourceType,
+    embySession: com.liujiaming.videohub.feature.emby.EmbyAuthSession?
+): Map<String, String> {
+    return when (sourceType) {
+        MediaSourceType.Emby -> mapOf("X-Emby-Token" to embySession?.accessToken.orEmpty())
+        else -> emptyMap()
+    }
+}
+
+private fun com.liujiaming.videohub.feature.emby.EmbyAuthSession.embyUserAvatarUrl(): String {
+    val tagQuery = userPrimaryImageTag.takeIf { it.isNotBlank() }?.let { "&tag=$it" }.orEmpty()
+    return "$serverUrl/Users/$userId/Images/Primary?fillHeight=96&quality=90$tagQuery&api_key=$accessToken"
+}
+
+private fun loadSourceAvatarBitmap(
+    context: Context,
+    imageUrl: String,
+    requestHeaders: Map<String, String>
+): Bitmap? {
+    if (imageUrl.isBlank()) return null
+    val file = sourceAvatarCacheFile(context, imageUrl)
+    if (file.exists() && file.length() > 0L) {
+        BitmapFactory.decodeFile(file.absolutePath)?.let { return it }
+    }
+    file.parentFile?.mkdirs()
+    val tempFile = File(file.parentFile, "${file.name}.tmp")
+    val connection = (URL(imageUrl).openConnection() as HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 10000
+        readTimeout = 15000
+        setRequestProperty("User-Agent", "Mozilla/5.0 VideoHub Android")
+        requestHeaders.forEach { (key, value) ->
+            if (value.isNotBlank()) setRequestProperty(key, value)
+        }
+    }
+    try {
+        val responseCode = connection.responseCode
+        if (responseCode !in 200..299) return null
+        connection.inputStream.use { input ->
+            tempFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        if (tempFile.length() > 0L) {
+            tempFile.renameTo(file)
+        } else {
+            tempFile.delete()
+        }
+        return BitmapFactory.decodeFile(file.absolutePath)
+    } finally {
+        connection.disconnect()
+    }
+}
+
+private fun sourceAvatarCacheFile(context: Context, imageUrl: String): File {
+    val directory = File(context.applicationContext.cacheDir, "server_avatar_cache")
+    return File(directory, "${md5(imageUrl)}.img")
+}
+
+private fun md5(value: String): String {
+    val digest = MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8))
+    return digest.joinToString("") { "%02x".format(it) }
+}
 @Composable
 private fun MediaActionButton(
     text: String,

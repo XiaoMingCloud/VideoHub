@@ -66,14 +66,22 @@ import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
 import com.liujiaming.videohub.feature.bilibili.BilibiliVideoDetail
 import com.liujiaming.videohub.feature.settings.SettingsMemory
 import com.liujiaming.videohub.ui.theme.ActiveGreen
+import com.liujiaming.videohub.ui.theme.CardBackground
+import com.liujiaming.videohub.ui.theme.PageBackground
+import com.liujiaming.videohub.ui.theme.PrimaryText
+import com.liujiaming.videohub.ui.theme.TextGray
 import androidx.core.view.WindowCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val DetailBackground = Color(0xFF121212)
-private val DetailCard = Color(0xFF333333)
-private val DetailText = Color.White
-private val DetailSubText = Color(0xFFAAAAAA)
+private val DetailBackground: Color
+    get() = PageBackground
+private val DetailCard: Color
+    get() = CardBackground
+private val DetailText: Color
+    get() = PrimaryText
+private val DetailSubText: Color
+    get() = TextGray
 
 @Composable
 fun MediaItemDetailScreen(
@@ -101,7 +109,8 @@ fun MediaItemDetailScreen(
     DisposableEffect(Unit) {
         val window = (view.context as? Activity)?.window
         if (window != null) {
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
+                !SettingsMemory.resolvedDarkMode
         }
         onDispose {
             if (window != null) {

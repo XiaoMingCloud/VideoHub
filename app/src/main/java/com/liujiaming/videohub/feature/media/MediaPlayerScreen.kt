@@ -57,6 +57,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -119,7 +120,7 @@ fun MediaPlayerScreen(
             )
         }
         ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, httpFactory)))
             .build()
             .apply {
                 playWhenReady = true
@@ -138,7 +139,11 @@ fun MediaPlayerScreen(
 
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 Log.e(PLAYER_TAG, "Playback error itemId=${item.id}: ${error.message}", error)
-                playerError = error.message ?: "播放失败"
+                playerError = if (item.sourceType == MediaSourceType.Local) {
+                    buildPlaybackErrorMessage(error)
+                } else {
+                    error.message ?: "播放失败"
+                }
             }
         }
         player.addListener(listener)
@@ -179,6 +184,12 @@ fun MediaPlayerScreen(
                             source = source,
                             debugText = "Bilibili session mid=${session.mid} cookieLength=${session.cookie.length} bvid=${item.id}\n" +
                                 "Bilibili source host=${source.url.hostOrPrefix()} headers=${source.headers.keys.joinToString(",")}"
+                        )
+                    }
+                    MediaSourceType.Local -> {
+                        DirectPlaybackTarget(
+                            url = item.id,
+                            debugText = "Local content uri=${item.id}"
                         )
                     }
                     else -> {

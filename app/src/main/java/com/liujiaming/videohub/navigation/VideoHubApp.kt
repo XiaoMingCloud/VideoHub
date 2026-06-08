@@ -17,6 +17,8 @@ import com.liujiaming.videohub.feature.filesource.AddSmbStorageScreen
 import com.liujiaming.videohub.feature.filesource.AddWebDavStorageScreen
 import com.liujiaming.videohub.feature.filesource.FileSourceScreen
 import com.liujiaming.videohub.feature.filesource.FileSourceTutorialScreen
+import com.liujiaming.videohub.feature.filesource.LocalFileBrowserScreen
+import com.liujiaming.videohub.feature.filesource.LocalFileSource
 import com.liujiaming.videohub.feature.filesource.ManageFileSourceScreen
 import com.liujiaming.videohub.feature.fnos.AddFnosScreen
 import com.liujiaming.videohub.feature.jellyfin.AddJellyfinScreen
@@ -58,6 +60,7 @@ fun VideoHubApp() {
         mutableStateOf<MediaBrowseRequest?>(null)
     }
     var selectedMediaItem by remember { mutableStateOf<MediaBrowseItem?>(null) }
+    var selectedLocalFileSource by remember { mutableStateOf<LocalFileSource?>(null) }
 
     /**
      * 导航到指定页面，将新页面压入返回栈。
@@ -190,9 +193,22 @@ fun VideoHubApp() {
         VideoHubScreen.FileSource -> FileSourceScreen(
             onAddFileSourceClick = { navigateTo(VideoHubScreen.ManageFileSource) },
             onTutorialClick = { navigateTo(VideoHubScreen.FileSourceTutorial) },
+            onLocalSourceClick = { source ->
+                selectedLocalFileSource = source
+                navigateTo(VideoHubScreen.LocalFileBrowser)
+            },
             onMediaClick = { switchRoot(VideoHubScreen.MediaLibrary) },
             onServerClick = { switchRoot(VideoHubScreen.ServerList) },
             onSettingsClick = { switchRoot(VideoHubScreen.Settings) }
+        )
+
+        VideoHubScreen.LocalFileBrowser -> LocalFileBrowserScreen(
+            source = selectedLocalFileSource,
+            onBackClick = ::goBack,
+            onVideoClick = { item ->
+                selectedMediaItem = item
+                navigateTo(VideoHubScreen.MediaPlayer)
+            }
         )
 
         // 文件源教程页面
@@ -209,7 +225,8 @@ fun VideoHubApp() {
         )
 
         VideoHubScreen.AddLocalStorage -> AddLocalStorageScreen(
-            onBackClick = ::goBack
+            onBackClick = ::goBack,
+            onAdded = { switchRoot(VideoHubScreen.FileSource) }
         )
 
         VideoHubScreen.AddSmbStorage -> AddSmbStorageScreen(
@@ -292,6 +309,7 @@ private enum class VideoHubScreen {
     AddFnos,
     /** 文件源页面 */
     FileSource,
+    LocalFileBrowser,
     /** 文件源教程页面 */
     FileSourceTutorial,
     /** 管理文件源页面 */

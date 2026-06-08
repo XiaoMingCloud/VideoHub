@@ -76,21 +76,35 @@ object BilibiliClient {
 
     fun fetchHome(session: BilibiliSession): EmbyMediaHome {
         val folders = fetchFavoriteFolders(session)
-        val sections = folders.take(8).map { folder ->
+        val previewsByFolderId = folders.associate { folder ->
+            folder.id to runCatching {
+                fetchFavoriteResources(session, folder.id, startIndex = 0, limit = 12).items
+            }.getOrDefault(emptyList())
+        }
+        val foldersWithCover = folders.map { folder ->
+            val previewCover = previewsByFolderId[folder.id]
+                ?.firstOrNull { it.imageUrl.isNotBlank() }
+                ?.imageUrl
+                .orEmpty()
+            if (folder.imageUrl.isBlank() && previewCover.isNotBlank()) {
+                folder.copy(imageUrl = previewCover)
+            } else {
+                folder
+            }
+        }
+        val sections = foldersWithCover.take(8).map { folder ->
             EmbyLibrarySection(
                 libraryId = folder.id,
                 title = folder.name,
-                items = runCatching {
-                    fetchFavoriteResources(session, folder.id, startIndex = 0, limit = 12).items
-                }.getOrDefault(emptyList())
+                items = previewsByFolderId[folder.id].orEmpty()
             )
         }
         val latestItems = sections.firstOrNull { it.items.isNotEmpty() }?.items.orEmpty()
         return EmbyMediaHome(
             sourceName = "Bilibili · ${session.username}",
-            libraries = folders,
+            libraries = foldersWithCover,
             resumeItems = emptyList(),
-            latestTitle = folders.firstOrNull()?.name ?: "Bilibili 收藏",
+            latestTitle = foldersWithCover.firstOrNull()?.name ?: "Bilibili 收藏",
             latestItems = latestItems,
             librarySections = sections
         )

@@ -109,6 +109,7 @@ fun MediaLibraryScreen(
     onFileClick: () -> Unit,
     onServerClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onHomeMediaClick: (MediaBrowseItem) -> Unit = {},
     onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
 ) {
     val context = LocalContext.current
@@ -253,6 +254,7 @@ fun MediaLibraryScreen(
                             refreshNonce++
                         }
                     },
+                    onHomeMediaClick = onHomeMediaClick,
                     onLibraryViewAllClick = onLibraryViewAllClick
                 )
             }
@@ -274,6 +276,7 @@ private fun ConnectedMediaLibraryContent(
     debugState: EmbyHomeDebugState?,
     isRefreshing: Boolean,
     onManualRefresh: () -> Unit,
+    onHomeMediaClick: (MediaBrowseItem) -> Unit,
     onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
 ) {
     val home = mediaHome ?: EmbyMediaHome(
@@ -354,9 +357,14 @@ private fun ConnectedMediaLibraryContent(
         )
 
         SectionTitle("继续观看")
-        HorizontalMediaRow(home.resumeItems, emptyText = "暂无继续观看")
+        HorizontalMediaRow(
+            items = home.resumeItems,
+            emptyText = "暂无继续观看",
+            sourceType = sourceType,
+            onMediaClick = onHomeMediaClick
+        )
 
-        MediaLibrarySections(home, sourceType, onLibraryViewAllClick)
+        MediaLibrarySections(home, sourceType, onLibraryViewAllClick, onHomeMediaClick)
     }
 }
 
@@ -565,7 +573,12 @@ private fun LibraryCard(
 }
 
 @Composable
-private fun HorizontalMediaRow(items: List<EmbyMediaItem>, emptyText: String) {
+private fun HorizontalMediaRow(
+    items: List<EmbyMediaItem>,
+    emptyText: String,
+    sourceType: MediaSourceType,
+    onMediaClick: (MediaBrowseItem) -> Unit
+) {
     if (items.isEmpty()) {
         EmptySectionCard(emptyText)
         return
@@ -573,7 +586,12 @@ private fun HorizontalMediaRow(items: List<EmbyMediaItem>, emptyText: String) {
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.id.ifBlank { it.name } }) { item ->
-            MediaPosterCard(item, width = 164.dp, imageHeight = 92.dp)
+            MediaPosterCard(
+                item = item,
+                width = 164.dp,
+                imageHeight = 92.dp,
+                onClick = { onMediaClick(item.toBrowseItem(sourceType)) }
+            )
         }
     }
 }
@@ -582,7 +600,8 @@ private fun HorizontalMediaRow(items: List<EmbyMediaItem>, emptyText: String) {
 private fun MediaLibrarySections(
     home: EmbyMediaHome,
     sourceType: MediaSourceType,
-    onLibraryViewAllClick: (MediaBrowseRequest) -> Unit
+    onLibraryViewAllClick: (MediaBrowseRequest) -> Unit,
+    onHomeMediaClick: (MediaBrowseItem) -> Unit
 ) {
     val sections = if (home.librarySections.isNotEmpty()) {
         home.librarySections
@@ -609,11 +628,21 @@ private fun MediaLibrarySections(
                 )
             }
         )
-        HorizontalLibraryContentRow(items = section.items, emptyText = "暂无${section.title}内容")
+        HorizontalLibraryContentRow(
+            items = section.items,
+            emptyText = "暂无${section.title}内容",
+            sourceType = sourceType,
+            onMediaClick = onHomeMediaClick
+        )
     }
 }
 @Composable
-private fun HorizontalLibraryContentRow(items: List<EmbyMediaItem>, emptyText: String) {
+private fun HorizontalLibraryContentRow(
+    items: List<EmbyMediaItem>,
+    emptyText: String,
+    sourceType: MediaSourceType,
+    onMediaClick: (MediaBrowseItem) -> Unit
+) {
     if (items.isEmpty()) {
         EmptySectionCard(emptyText)
         return
@@ -621,7 +650,12 @@ private fun HorizontalLibraryContentRow(items: List<EmbyMediaItem>, emptyText: S
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(items, key = { it.id.ifBlank { it.name } }) { item ->
-            MediaPosterCard(item, width = 164.dp, imageHeight = 92.dp)
+            MediaPosterCard(
+                item = item,
+                width = 164.dp,
+                imageHeight = 92.dp,
+                onClick = { onMediaClick(item.toBrowseItem(sourceType)) }
+            )
         }
     }
 }
@@ -631,18 +665,21 @@ private fun MediaPosterCard(
     item: EmbyMediaItem,
     modifier: Modifier = Modifier,
     width: Dp? = null,
-    imageHeight: Dp
+    imageHeight: Dp,
+    onClick: () -> Unit
 ) {
     val cardModifier = if (width != null) modifier.width(width) else modifier
     MediaCardShell(modifier = cardModifier) {
-        PosterFrame(
-            height = imageHeight,
-            imageUrl = item.imageUrl,
-            showPlay = false
-        ) {
-            RemotePoster()
+        Column(modifier = Modifier.clickable(onClick = onClick)) {
+            PosterFrame(
+                height = imageHeight,
+                imageUrl = item.imageUrl,
+                showPlay = false
+            ) {
+                RemotePoster()
+            }
+            CardTextBlock(title = item.name, subtitle = item.subtitle)
         }
-        CardTextBlock(title = item.name, subtitle = item.subtitle)
     }
 }
 
@@ -871,28 +908,44 @@ private fun EmbyDebugCard(state: EmbyHomeDebugState) {
 }
 
 private fun EmbyMediaHome.sanitized(): EmbyMediaHome {
+    val cleanSections = librarySections
+        .filter { it.libraryId.isNotBlank() || it.title.isNotBlank() }
+        .take(20)
+        .map { section ->
+            section.copy(
+                items = section.items
+                    .filter { it.id.isNotBlank() || it.name.isNotBlank() }
+                    .take(20)
+            )
+        }
+    val sectionsByLibraryId = cleanSections.associateBy { it.libraryId }
+    val cleanLibraries = libraries
+        .filter { it.id.isNotBlank() || it.name.isNotBlank() }
+        .take(20)
+        .map { library ->
+            val previewCover = sectionsByLibraryId[library.id]
+                ?.items
+                ?.firstOrNull { it.imageUrl.isNotBlank() }
+                ?.imageUrl
+                .orEmpty()
+            if (library.imageUrl.isBlank() && previewCover.isNotBlank()) {
+                library.copy(imageUrl = previewCover)
+            } else {
+                library
+            }
+        }
+
     return copy(
         sourceName = sourceName.ifBlank { "Emby" },
-        libraries = libraries
-            .filter { it.id.isNotBlank() || it.name.isNotBlank() }
-            .take(20),
+        libraries = cleanLibraries,
         resumeItems = resumeItems
             .filter { it.id.isNotBlank() || it.name.isNotBlank() }
             .take(20),
-        latestTitle = latestTitle.ifBlank { libraries.firstOrNull()?.name ?: "最新媒体" },
+        latestTitle = latestTitle.ifBlank { cleanLibraries.firstOrNull()?.name ?: "最新媒体" },
         latestItems = latestItems
             .filter { it.id.isNotBlank() || it.name.isNotBlank() }
             .take(30),
-        librarySections = librarySections
-            .filter { it.libraryId.isNotBlank() || it.title.isNotBlank() }
-            .take(20)
-            .map { section ->
-                section.copy(
-                    items = section.items
-                        .filter { it.id.isNotBlank() || it.name.isNotBlank() }
-                        .take(20)
-                )
-            }
+        librarySections = cleanSections
     )
 }
 
@@ -1156,6 +1209,19 @@ private fun sourceAvatarCacheFile(context: Context, imageUrl: String): File {
 private fun md5(value: String): String {
     val digest = MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8))
     return digest.joinToString("") { "%02x".format(it) }
+}
+
+private fun EmbyMediaItem.toBrowseItem(sourceType: MediaSourceType): MediaBrowseItem {
+    return MediaBrowseItem(
+        id = id,
+        name = name,
+        type = type,
+        imageUrl = imageUrl,
+        playbackProgress = playbackProgress,
+        played = played,
+        subtitle = subtitle,
+        sourceType = sourceType
+    )
 }
 @Composable
 private fun MediaActionButton(

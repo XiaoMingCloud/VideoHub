@@ -7,6 +7,7 @@ import com.liujiaming.videohub.feature.emby.EmbyLibraryItemsCache
 import com.liujiaming.videohub.feature.emby.EmbyMediaItem
 import com.liujiaming.videohub.feature.emby.EmbySessionStore
 import com.liujiaming.videohub.feature.bilibili.BilibiliClient
+import com.liujiaming.videohub.feature.bilibili.BilibiliHomeCache
 import com.liujiaming.videohub.feature.bilibili.BilibiliSessionStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -99,7 +100,8 @@ private object BilibiliMediaBrowseDataSource : MediaBrowseDataSource {
     ): MediaBrowseSeed = withContext(Dispatchers.IO) {
         val session = BilibiliSessionStore.load(context)
             ?: error("请先扫码登录 Bilibili")
-        val folders = BilibiliClient.fetchFavoriteFolders(session)
+        val folders = BilibiliHomeCache.load(context, session.mid)?.home?.libraries
+            ?: BilibiliClient.fetchFavoriteFolders(session)
         val folder = folders.firstOrNull { it.id == request.containerId }
         MediaBrowseSeed(
             title = request.title ?: folder?.name ?: "Bilibili 收藏",

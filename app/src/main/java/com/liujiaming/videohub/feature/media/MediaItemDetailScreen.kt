@@ -199,23 +199,25 @@ fun MediaItemDetailScreen(
                 CastPeopleSection(detail = detail)
             }
 
-            SectionLabel("音视频字幕信息")
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                TechnicalInfoCard(
-                    title = "视频信息",
-                    rows = videoInfoRowsV2(detail),
-                    modifier = Modifier.weight(1f)
-                )
-                TechnicalInfoCard(
-                    title = "音频信息",
-                    rows = audioInfoRowsV2(item, detail),
-                    modifier = Modifier.weight(1f)
-                )
+            if (item.sourceType != MediaSourceType.Bilibili) {
+                SectionLabel("音视频字幕信息")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    TechnicalInfoCard(
+                        title = "视频信息",
+                        rows = videoInfoRowsV2(detail),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TechnicalInfoCard(
+                        title = "音频信息",
+                        rows = audioInfoRowsV2(item, detail),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
             PathInfoCard(detail = detail)

@@ -120,6 +120,10 @@ fun VideoHubApp() {
             onFileClick = { switchRoot(VideoHubScreen.FileSource) },
             onServerClick = { switchRoot(VideoHubScreen.ServerList) },
             onSettingsClick = { switchRoot(VideoHubScreen.Settings) },
+            onHomeMediaClick = { item ->
+                selectedMediaItem = item
+                navigateTo(VideoHubScreen.MediaItemDetail)
+            },
             onLibraryViewAllClick = { request ->
                 selectedLibraryId = request.containerId
                 selectedBrowseRequest = request

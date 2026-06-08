@@ -10,10 +10,7 @@ import java.net.URLEncoder
 import java.net.URL
 
 /**
- * Emby 首页数据拉取客户端。
- * 通过 Emby REST API 获取媒体库列表、继续观看、最新媒体等首页数据。
- * 所有网络请求使用 HttpURLConnection 实现，统一通过 X-Emby-Token 进行鉴权。
- */
+ * Emby 棣栭〉鏁版嵁鎷夊彇瀹㈡埛绔€? * 閫氳繃 Emby REST API 鑾峰彇濯掍綋搴撳垪琛ㄣ€佺户缁鐪嬨€佹渶鏂板獟浣撶瓑棣栭〉鏁版嵁銆? * 鎵€鏈夌綉缁滆姹備娇鐢?HttpURLConnection 瀹炵幇锛岀粺涓€閫氳繃 X-Emby-Token 杩涜閴存潈銆? */
 object EmbyHomeClient {
     private const val TAG = "EmbyHomeClient"
 
@@ -44,8 +41,8 @@ object EmbyHomeClient {
                 "IncludeItemTypes" to "Movie,Series,Episode,Video,Folder",
                 "StartIndex" to startIndex.coerceAtLeast(0).toString(),
                 "Limit" to limit.coerceAtLeast(1).toString(),
-                "SortBy" to "DateCreated",
-                "SortOrder" to "Descending"
+                    "SortBy" to "DateCreated",
+                    "SortOrder" to "Descending"
             )
         )
         val items = json.optJSONArray("Items") ?: JSONArray()
@@ -170,18 +167,15 @@ object EmbyHomeClient {
     }
 
     /**
-     * 拉取 Emby 首页的全部媒体数据。
-     * 包括：媒体库列表、继续观看列表、每个媒体库的详情分区。
-     *
-     * @param session 已认证的 Emby 会话
-     * @return 组装完成的首页数据模型
-     */
+     * 鎷夊彇 Emby 棣栭〉鐨勫叏閮ㄥ獟浣撴暟鎹€?     * 鍖呮嫭锛氬獟浣撳簱鍒楄〃銆佺户缁鐪嬪垪琛ㄣ€佹瘡涓獟浣撳簱鐨勮鎯呭垎鍖恒€?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @return 缁勮瀹屾垚鐨勯椤垫暟鎹ā鍨?     */
     fun fetchHome(session: EmbyAuthSession): EmbyMediaHome {
-        // 拉取用户的媒体库列表
+        // 鎷夊彇鐢ㄦ埛鐨勫獟浣撳簱鍒楄〃
         val libraries = fetchLibraries(session)
-        // 拉取继续观看（断点续播）列表
+        // 鎷夊彇缁х画瑙傜湅锛堟柇鐐圭画鎾級鍒楄〃
         val resumeItems = fetchResumeItems(session)
-        // 为每个媒体库拉取详情分区（包含最新的媒体项）
+        // 涓烘瘡涓獟浣撳簱鎷夊彇璇︽儏鍒嗗尯锛堝寘鍚渶鏂扮殑濯掍綋椤癸級
         val librarySections = libraries.map { library ->
             EmbyLibrarySection(
                 libraryId = library.id,
@@ -189,26 +183,36 @@ object EmbyHomeClient {
                 items = fetchLibraryItems(session, library.id)
             )
         }
-        // 取第一个非空媒体库的项目作为"最新媒体"展示
+        // 鍙栫涓€涓潪绌哄獟浣撳簱鐨勯」鐩綔涓?鏈€鏂板獟浣?灞曠ず
         val latestItems = librarySections.firstOrNull { it.items.isNotEmpty() }?.items.orEmpty()
+        val librariesWithCover = libraries.map { library ->
+            val previewCover = librarySections
+                .firstOrNull { it.libraryId == library.id }
+                ?.items
+                ?.firstOrNull { it.imageUrl.isNotBlank() }
+                ?.imageUrl
+                .orEmpty()
+            if (library.imageUrl.isBlank() && previewCover.isNotBlank()) {
+                library.copy(imageUrl = previewCover)
+            } else {
+                library
+            }
+        }
 
         return EmbyMediaHome(
             sourceName = session.serverName.ifBlank { "Emby" },
-            libraries = libraries,
+            libraries = librariesWithCover,
             resumeItems = resumeItems,
-            latestTitle = libraries.firstOrNull()?.name ?: "最新媒体",
+            latestTitle = librariesWithCover.firstOrNull()?.name ?: "最新媒体",
             latestItems = latestItems,
             librarySections = librarySections
         )
     }
 
     /**
-     * 拉取用户可见的所有媒体库列表。
-     * 调用 /Users/{userId}/Views 接口获取媒体库视图。
-     *
-     * @param session 已认证的 Emby 会话
-     * @return 媒体库摘要列表
-     */
+     * 鎷夊彇鐢ㄦ埛鍙鐨勬墍鏈夊獟浣撳簱鍒楄〃銆?     * 璋冪敤 /Users/{userId}/Views 鎺ュ彛鑾峰彇濯掍綋搴撹鍥俱€?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @return 濯掍綋搴撴憳瑕佸垪琛?     */
     private fun fetchLibraries(session: EmbyAuthSession): List<EmbyLibrarySummary> {
         val json = getJsonObject(session, "/Users/${session.userId}/Views")
         val items = json.optJSONArray("Items") ?: return emptyList()
@@ -220,14 +224,15 @@ object EmbyHomeClient {
                 if (id.isBlank()) continue
 
                 val fallbackCount = item.optInt("ChildCount", 0)
+                val hasPrimaryImage = item.optJSONObject("ImageTags")?.has("Primary") == true ||
+                    item.optString("PrimaryImageTag").isNotBlank()
                 add(
                     EmbyLibrarySummary(
                         id = id,
                         name = item.optString("Name", "媒体库"),
                         collectionType = item.optString("CollectionType"),
-                        // 通过额外请求获取精确的媒体项数量，如果失败则使用 ChildCount 作为回退值
                         itemCount = fetchLibraryItemCount(session, id, fallbackCount),
-                        imageUrl = imageUrl(session, id, 240)
+                        imageUrl = if (hasPrimaryImage) imageUrl(session, id, 240) else ""
                     )
                 )
             }
@@ -235,13 +240,10 @@ object EmbyHomeClient {
     }
 
     /**
-     * 获取指定媒体库中的媒体项总数。
-     * 通过 Limit=0 的查询只获取 TotalRecordCount，不拉取实际数据。
-     *
-     * @param session 已认证的 Emby 会话
-     * @param libraryId 媒体库 ID
-     * @param fallbackCount 请求失败时的回退值
-     * @return 媒体项总数
+     * 鑾峰彇鎸囧畾濯掍綋搴撲腑鐨勫獟浣撻」鎬绘暟銆?     * 閫氳繃 Limit=0 鐨勬煡璇㈠彧鑾峰彇 TotalRecordCount锛屼笉鎷夊彇瀹為檯鏁版嵁銆?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @param libraryId 濯掍綋搴?ID
+     * @param fallbackCount 璇锋眰澶辫触鏃剁殑鍥為€€鍊?     * @return 濯掍綋椤规€绘暟
      */
     private fun fetchLibraryItemCount(
         session: EmbyAuthSession,
@@ -255,7 +257,7 @@ object EmbyHomeClient {
                 query = mapOf(
                     "ParentId" to libraryId,
                     "Recursive" to "true",
-                    "Limit" to "0"             // 不返回实际数据，仅获取总数
+                    "Limit" to "0"             // 涓嶈繑鍥炲疄闄呮暟鎹紝浠呰幏鍙栨€绘暟
                 )
             )
             json.optInt("TotalRecordCount", fallbackCount)
@@ -263,12 +265,10 @@ object EmbyHomeClient {
     }
 
     /**
-     * 拉取指定媒体库中的媒体项列表（最多 10 个，按创建时间降序）。
-     *
-     * @param session 已认证的 Emby 会话
-     * @param libraryId 媒体库 ID
-     * @return 媒体项列表
-     */
+     * 鎷夊彇鎸囧畾濯掍綋搴撲腑鐨勫獟浣撻」鍒楄〃锛堟渶澶?10 涓紝鎸夊垱寤烘椂闂撮檷搴忥級銆?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @param libraryId 濯掍綋搴?ID
+     * @return 濯掍綋椤瑰垪琛?     */
     private fun fetchLibraryItems(session: EmbyAuthSession, libraryId: String): List<EmbyMediaItem> {
         return runCatching {
             fetchItems(
@@ -279,23 +279,20 @@ object EmbyHomeClient {
                     "Recursive" to "true",
                     "IncludeItemTypes" to "Movie,Series,Episode,Video,Folder",
                     "Limit" to "60",
-                    "SortBy" to "DateCreated",     // 按创建时间排序
-                    "SortOrder" to "Descending"     // 降序，最新的在前
+                    "SortBy" to "DateCreated",
+                    "SortOrder" to "Descending"
                 )
             )
         }.getOrDefault(emptyList())
     }
 
     /**
-     * 拉取继续观看（断点续播）列表。
-     * 优先尝试 /Items/Resume 接口，失败时回退到带 IsResumable 过滤器的通用接口。
-     *
-     * @param session 已认证的 Emby 会话
-     * @return 可继续观看的媒体项列表
-     */
+     * 鎷夊彇缁х画瑙傜湅锛堟柇鐐圭画鎾級鍒楄〃銆?     * 浼樺厛灏濊瘯 /Items/Resume 鎺ュ彛锛屽け璐ユ椂鍥為€€鍒板甫 IsResumable 杩囨护鍣ㄧ殑閫氱敤鎺ュ彛銆?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @return 鍙户缁鐪嬬殑濯掍綋椤瑰垪琛?     */
     private fun fetchResumeItems(session: EmbyAuthSession): List<EmbyMediaItem> {
         return runCatching {
-            // 优先使用专用的 Resume 接口
+            // 浼樺厛浣跨敤涓撶敤鐨?Resume 鎺ュ彛
             fetchItems(
                 session = session,
                 path = "/Users/${session.userId}/Items/Resume",
@@ -305,7 +302,6 @@ object EmbyHomeClient {
                 )
             )
         }.getOrElse {
-            // 回退方案：使用通用接口 + IsResumable 过滤器
             fetchItems(
                 session = session,
                 path = "/Users/${session.userId}/Items",
@@ -313,7 +309,7 @@ object EmbyHomeClient {
                     "Recursive" to "true",
                     "Filters" to "IsResumable",
                     "Limit" to "10",
-                    "SortBy" to "DatePlayed",      // 按播放时间排序
+                    "SortBy" to "DatePlayed",
                     "SortOrder" to "Descending"
                 )
             )
@@ -321,13 +317,11 @@ object EmbyHomeClient {
     }
 
     /**
-     * 通用的媒体项拉取方法，解析 Items 数组并转换为 [EmbyMediaItem] 列表。
-     *
-     * @param session 已认证的 Emby 会话
-     * @param path API 路径
-     * @param query 查询参数
-     * @return 解析后的媒体项列表
-     */
+     * 閫氱敤鐨勫獟浣撻」鎷夊彇鏂规硶锛岃В鏋?Items 鏁扮粍骞惰浆鎹负 [EmbyMediaItem] 鍒楄〃銆?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @param path API 璺緞
+     * @param query 鏌ヨ鍙傛暟
+     * @return 瑙ｆ瀽鍚庣殑濯掍綋椤瑰垪琛?     */
     private fun fetchItems(
         session: EmbyAuthSession,
         path: String,
@@ -344,9 +338,7 @@ object EmbyHomeClient {
     }
 
     /**
-     * 将 JSON 对象转换为 [EmbyMediaItem] 数据模型。
-     * 自动为有效的媒体项生成封面图片 URL。
-     */
+     * 灏?JSON 瀵硅薄杞崲涓?[EmbyMediaItem] 鏁版嵁妯″瀷銆?     * 鑷姩涓烘湁鏁堢殑濯掍綋椤圭敓鎴愬皝闈㈠浘鐗?URL銆?     */
     private fun JSONObject.toMediaItem(session: EmbyAuthSession): EmbyMediaItem {
         val id = optString("Id")
         val userData = optJSONObject("UserData")
@@ -368,20 +360,18 @@ object EmbyHomeClient {
     }
 
     /**
-     * 构建 Emby 媒体项封面图片的 URL。
-     *
-     * @param session 已认证的 Emby 会话
-     * @param itemId 媒体项 ID
-     * @param height 图片目标高度（像素）
-     * @return 完整的图片 URL，包含 API Key 鉴权参数
+     * 鏋勫缓 Emby 濯掍綋椤瑰皝闈㈠浘鐗囩殑 URL銆?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @param itemId 濯掍綋椤?ID
+     * @param height 鍥剧墖鐩爣楂樺害锛堝儚绱狅級
+     * @return 瀹屾暣鐨勫浘鐗?URL锛屽寘鍚?API Key 閴存潈鍙傛暟
      */
     private fun imageUrl(session: EmbyAuthSession, itemId: String, height: Int): String {
         return "${session.serverUrl}/Items/$itemId/Images/Primary?fillHeight=$height&quality=90&api_key=${encode(session.accessToken)}"
     }
 
     /**
-     * 发送 GET 请求并返回解析后的 JSONObject。
-     */
+     * 鍙戦€?GET 璇锋眰骞惰繑鍥炶В鏋愬悗鐨?JSONObject銆?     */
     private fun getJsonObject(
         session: EmbyAuthSession,
         path: String,
@@ -391,15 +381,12 @@ object EmbyHomeClient {
     }
 
     /**
-     * 发送 HTTP GET 请求并返回响应文本。
-     * 自动添加 X-Emby-Token 鉴权头。
-     *
-     * @param session 已认证的 Emby 会话
-     * @param path API 路径
-     * @param query 查询参数键值对
-     * @return 响应体的文本内容
-     * @throws EmbyAuthException 请求失败时抛出
-     */
+     * 鍙戦€?HTTP GET 璇锋眰骞惰繑鍥炲搷搴旀枃鏈€?     * 鑷姩娣诲姞 X-Emby-Token 閴存潈澶淬€?     *
+     * @param session 宸茶璇佺殑 Emby 浼氳瘽
+     * @param path API 璺緞
+     * @param query 鏌ヨ鍙傛暟閿€煎
+     * @return 鍝嶅簲浣撶殑鏂囨湰鍐呭
+     * @throws EmbyAuthException 璇锋眰澶辫触鏃舵姏鍑?     */
     private fun getTextResponse(
         session: EmbyAuthSession,
         path: String,
@@ -409,14 +396,13 @@ object EmbyHomeClient {
         Log.d(TAG, "GET $path query=$query")
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
-            connectTimeout = 10000       // 连接超时 10 秒
-            readTimeout = 15000          // 读取超时 15 秒
+            connectTimeout = 10000
+            readTimeout = 15000
             setRequestProperty("Accept", "application/json")
-            setRequestProperty("X-Emby-Token", session.accessToken)  // 令牌鉴权
+            setRequestProperty("X-Emby-Token", session.accessToken)
         }
 
         val responseCode = connection.responseCode
-        // 根据响应码选择读取正常流或错误流
         val stream = if (responseCode in 200..299) {
             connection.inputStream
         } else {
@@ -434,13 +420,11 @@ object EmbyHomeClient {
     }
 
     /**
-     * 构建完整的请求 URL，拼接路径和查询参数。
-     *
-     * @param baseUrl 服务器基础 URL
-     * @param path API 路径
-     * @param query 查询参数
-     * @return 完整的 URL 字符串
-     */
+     * 鏋勫缓瀹屾暣鐨勮姹?URL锛屾嫾鎺ヨ矾寰勫拰鏌ヨ鍙傛暟銆?     *
+     * @param baseUrl 鏈嶅姟鍣ㄥ熀纭€ URL
+     * @param path API 璺緞
+     * @param query 鏌ヨ鍙傛暟
+     * @return 瀹屾暣鐨?URL 瀛楃涓?     */
     private fun buildUrl(baseUrl: String, path: String, query: Map<String, String>): String {
         val queryText = query.entries.joinToString("&") { (key, value) ->
             "${encode(key)}=${encode(value)}"
@@ -448,7 +432,7 @@ object EmbyHomeClient {
         return if (queryText.isBlank()) "$baseUrl$path" else "$baseUrl$path?$queryText"
     }
 
-    /** 对字符串进行 URL 编码 */
+    /** 瀵瑰瓧绗︿覆杩涜 URL 缂栫爜 */
     private fun encode(value: String): String {
         return URLEncoder.encode(value, Charsets.UTF_8.name())
     }
@@ -514,7 +498,7 @@ object EmbyHomeClient {
         val id = optString("Id")
         return EmbyPersonInfo(
             id = id,
-            name = optString("Name"),
+            name = optString("Name", "未命名"),
             role = optString("Role"),
             type = optString("Type"),
             imageUrl = if (id.isBlank()) "" else imageUrl(session, id, 220)
@@ -523,14 +507,11 @@ object EmbyHomeClient {
 }
 
 /**
- * Emby 首页媒体数据模型，包含首页展示所需的全部数据。
- *
- * @property sourceName 数据源名称（服务器名称）
- * @property libraries 媒体库摘要列表
- * @property resumeItems 继续观看（断点续播）列表
- * @property latestTitle 最新媒体分区标题
- * @property latestItems 最新媒体项列表
- * @property librarySections 各媒体库的详情分区（包含库内媒体项）
+ * Emby 棣栭〉濯掍綋鏁版嵁妯″瀷锛屽寘鍚椤靛睍绀烘墍闇€鐨勫叏閮ㄦ暟鎹€? *
+ * @property sourceName 鏁版嵁婧愬悕绉帮紙鏈嶅姟鍣ㄥ悕绉帮級
+ * @property libraries 濯掍綋搴撴憳瑕佸垪琛? * @property resumeItems 缁х画瑙傜湅锛堟柇鐐圭画鎾級鍒楄〃
+ * @property latestTitle 鏈€鏂板獟浣撳垎鍖烘爣棰? * @property latestItems 鏈€鏂板獟浣撻」鍒楄〃
+ * @property librarySections 鍚勫獟浣撳簱鐨勮鎯呭垎鍖猴紙鍖呭惈搴撳唴濯掍綋椤癸級
  */
 data class EmbyMediaHome(
     val sourceName: String,
@@ -542,11 +523,9 @@ data class EmbyMediaHome(
 )
 
 /**
- * 媒体库详情分区，表示一个媒体库及其包含的媒体项。
- *
- * @property libraryId 所属媒体库 ID
- * @property title 分区标题（通常为媒体库名称）
- * @property items 该分区内的媒体项列表
+ * 濯掍綋搴撹鎯呭垎鍖猴紝琛ㄧず涓€涓獟浣撳簱鍙婂叾鍖呭惈鐨勫獟浣撻」銆? *
+ * @property libraryId 鎵€灞炲獟浣撳簱 ID
+ * @property title 鍒嗗尯鏍囬锛堥€氬父涓哄獟浣撳簱鍚嶇О锛? * @property items 璇ュ垎鍖哄唴鐨勫獟浣撻」鍒楄〃
  */
 data class EmbyLibrarySection(
     val libraryId: String,
@@ -560,13 +539,11 @@ data class EmbyLibraryItemsPage(
 )
 
 /**
- * 媒体库摘要信息。
- *
- * @property id 媒体库 ID
- * @property name 媒体库名称
- * @property collectionType 集合类型（如 movies、tvshows 等）
- * @property itemCount 媒体项总数
- * @property imageUrl 媒体库封面图片 URL
+ * 濯掍綋搴撴憳瑕佷俊鎭€? *
+ * @property id 濯掍綋搴?ID
+ * @property name 濯掍綋搴撳悕绉? * @property collectionType 闆嗗悎绫诲瀷锛堝 movies銆乼vshows 绛夛級
+ * @property itemCount 濯掍綋椤规€绘暟
+ * @property imageUrl 濯掍綋搴撳皝闈㈠浘鐗?URL
  */
 data class EmbyLibrarySummary(
     val id: String,
@@ -577,12 +554,10 @@ data class EmbyLibrarySummary(
 )
 
 /**
- * 媒体项数据模型，表示一个具体的媒体内容（电影、剧集、视频等）。
- *
- * @property id 媒体项 ID
- * @property name 媒体项名称
- * @property type 媒体项类型（Movie/Series/Episode/Video 等）
- * @property imageUrl 封面图片 URL
+ * 濯掍綋椤规暟鎹ā鍨嬶紝琛ㄧず涓€涓叿浣撶殑濯掍綋鍐呭锛堢數褰便€佸墽闆嗐€佽棰戠瓑锛夈€? *
+ * @property id 濯掍綋椤?ID
+ * @property name 濯掍綋椤瑰悕绉? * @property type 濯掍綋椤圭被鍨嬶紙Movie/Series/Episode/Video 绛夛級
+ * @property imageUrl 灏侀潰鍥剧墖 URL
  */
 data class EmbyMediaItem(
     val id: String,
